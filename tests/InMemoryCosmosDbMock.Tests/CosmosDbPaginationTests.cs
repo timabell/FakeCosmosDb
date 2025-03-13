@@ -35,18 +35,18 @@ public class CosmosDbPaginationTests
     {
         // Request first page with 5 items
         var (page1Results, page1Token) = await _db.QueryWithPaginationAsync(_containerName, "SELECT * FROM c", 5);
-        
+
         // Verify first page
         Assert.Equal(5, page1Results.Count());
         Assert.NotNull(page1Token);
-        
+
         // Request second page
         var (page2Results, page2Token) = await _db.QueryWithPaginationAsync(_containerName, "SELECT * FROM c", 5, page1Token);
-        
+
         // Verify second page
         Assert.Equal(5, page2Results.Count());
         Assert.NotNull(page2Token);
-        
+
         // Verify no overlap between pages
         var page1Ids = page1Results.Select(item => item["id"].ToString()).ToList();
         var page2Ids = page2Results.Select(item => item["id"].ToString()).ToList();
@@ -58,7 +58,7 @@ public class CosmosDbPaginationTests
     {
         // Request items from category A with pagination
         var (results, token) = await _db.QueryWithPaginationAsync(_containerName, "SELECT * FROM c WHERE c.Category = 'A'", 3);
-        
+
         // Verify results
         Assert.Equal(3, results.Count());
         foreach (var item in results)
@@ -72,7 +72,7 @@ public class CosmosDbPaginationTests
     {
         // Request all items with a large enough page size
         var (results, token) = await _db.QueryWithPaginationAsync(_containerName, "SELECT * FROM c", 25);
-        
+
         // Verify we got all items and no continuation token
         Assert.Equal(20, results.Count());
         Assert.Null(token);

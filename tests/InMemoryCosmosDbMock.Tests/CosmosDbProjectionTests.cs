@@ -53,10 +53,10 @@ public class CosmosDbProjectionTests
     {
         // Query with projection
         var results = await _db.QueryAsync(_containerName, "SELECT c.Name, c.Age FROM c");
-        
+
         // Should return 3 items with only Name and Age (plus id for consistency)
         Assert.Equal(3, results.Count());
-        
+
         foreach (var item in results)
         {
             // Verify only requested properties (plus id) are returned
@@ -64,7 +64,7 @@ public class CosmosDbProjectionTests
             Assert.Contains("id", item.Properties().Select(p => p.Name));
             Assert.Contains("Name", item.Properties().Select(p => p.Name));
             Assert.Contains("Age", item.Properties().Select(p => p.Name));
-            
+
             // Verify other properties are not included
             Assert.DoesNotContain("Email", item.Properties().Select(p => p.Name));
             Assert.DoesNotContain("Address", item.Properties().Select(p => p.Name));
@@ -77,19 +77,19 @@ public class CosmosDbProjectionTests
     {
         // Query with nested property projection
         var results = await _db.QueryAsync(_containerName, "SELECT c.Name, c.Address.City FROM c");
-        
+
         // Should return 3 items with Name and Address.City
         Assert.Equal(3, results.Count());
-        
+
         foreach (var item in results)
         {
             // Verify Name property is included
             Assert.Contains("Name", item.Properties().Select(p => p.Name));
-            
+
             // Verify Address property is included and has City
             Assert.Contains("Address", item.Properties().Select(p => p.Name));
             Assert.NotNull(item["Address"]["City"]);
-            
+
             // Verify other Address properties are not included
             Assert.Null(item["Address"]["ZipCode"]);
             Assert.Null(item["Address"]["Country"]);
@@ -101,7 +101,7 @@ public class CosmosDbProjectionTests
     {
         // Query with LIMIT
         var results = await _db.QueryAsync(_containerName, "SELECT * FROM c LIMIT 2");
-        
+
         // Should return only 2 items
         Assert.Equal(2, results.Count());
     }
@@ -111,10 +111,10 @@ public class CosmosDbProjectionTests
     {
         // Query with both projection and filter
         var results = await _db.QueryAsync(_containerName, "SELECT c.Name, c.Age FROM c WHERE c.Age > 25");
-        
+
         // Should return 2 items (John and Bob) with only Name and Age
         Assert.Equal(2, results.Count());
-        
+
         foreach (var item in results)
         {
             // Verify only requested properties are returned
@@ -122,7 +122,7 @@ public class CosmosDbProjectionTests
             Assert.Contains("id", item.Properties().Select(p => p.Name));
             Assert.Contains("Name", item.Properties().Select(p => p.Name));
             Assert.Contains("Age", item.Properties().Select(p => p.Name));
-            
+
             // Verify age is > 25
             Assert.True((int)item["Age"] > 25);
         }

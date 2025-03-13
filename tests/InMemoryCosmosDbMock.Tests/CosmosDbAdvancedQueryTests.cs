@@ -59,7 +59,7 @@ public class CosmosDbAdvancedQueryTests
     {
         // Query using CONTAINS function
         var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE CONTAINS(c.Name, 'oh')");
-        
+
         // Should match "John Smith" and "Bob Johnson"
         Assert.Equal(2, results.Count());
         Assert.Contains(results, item => item["Name"].ToString() == "John Smith");
@@ -71,7 +71,7 @@ public class CosmosDbAdvancedQueryTests
     {
         // Query using STARTSWITH function
         var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE STARTSWITH(c.Name, 'J')");
-        
+
         // Should match "John Smith" and "Jane Doe"
         Assert.Equal(2, results.Count());
         Assert.Contains(results, item => item["Name"].ToString() == "John Smith");
@@ -83,7 +83,7 @@ public class CosmosDbAdvancedQueryTests
     {
         // Query using greater than comparison
         var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE c.Age > 30");
-        
+
         // Should match "Bob Johnson" (40) and "Alice Brown" (35)
         Assert.Equal(2, results.Count());
         Assert.Contains(results, item => item["Name"].ToString() == "Bob Johnson");
@@ -95,7 +95,7 @@ public class CosmosDbAdvancedQueryTests
     {
         // Query using less than comparison
         var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE c.Age < 30");
-        
+
         // Should match "Jane Doe" (25)
         Assert.Single(results);
         Assert.Equal("Jane Doe", results.First()["Name"].ToString());
@@ -106,7 +106,7 @@ public class CosmosDbAdvancedQueryTests
     {
         // Query using a nested property
         var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE c.Address.City = 'Chicago'");
-        
+
         // Should match "Bob Johnson"
         Assert.Single(results);
         Assert.Equal("Bob Johnson", results.First()["Name"].ToString());

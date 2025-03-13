@@ -39,7 +39,7 @@ public class CosmosDbMockAdapter : ICosmosDbMock
             var response = await iterator.ReadNextAsync();
             results.AddRange(response);
         }
-        
+
         return results;
     }
 
@@ -47,7 +47,7 @@ public class CosmosDbMockAdapter : ICosmosDbMock
     {
         var container = _cosmosClient.GetContainer(_databaseId, containerName);
         var queryDefinition = new QueryDefinition(sql);
-        
+
         // Create query options with pagination parameters
         var queryOptions = new QueryRequestOptions
         {
@@ -61,7 +61,7 @@ public class CosmosDbMockAdapter : ICosmosDbMock
 
         // Read the next page
         var response = await iterator.ReadNextAsync();
-        
+
         return (response, response.ContinuationToken);
     }
 }

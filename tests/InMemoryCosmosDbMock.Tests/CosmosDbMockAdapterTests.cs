@@ -101,18 +101,18 @@ public class CosmosDbMockAdapterTests
 
         // Act - Query with CONTAINS
         var containsResults = await mockAdapter.QueryAsync(_containerName, "SELECT * FROM c WHERE CONTAINS(c.Name, 'Product')");
-        
+
         // Assert
         Assert.Equal(3, containsResults.Count());
 
         // Act - Query with comparison and projection
         var projectionResults = await mockAdapter.QueryAsync(_containerName, "SELECT c.Name, c.Price FROM c WHERE c.Price < 100");
-        
+
         // Assert
         Assert.Single(projectionResults);
         Assert.Equal("Product B", projectionResults.First()["Name"].ToString());
         Assert.Equal(19.99, (double)projectionResults.First()["Price"]);
-        
+
         // Verify projection only returned requested fields (plus id)
         Assert.Equal(3, projectionResults.First().Count()); // id, Name, Price
     }
