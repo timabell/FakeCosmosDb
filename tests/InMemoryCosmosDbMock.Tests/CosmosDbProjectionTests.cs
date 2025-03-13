@@ -61,7 +61,7 @@ public class CosmosDbProjectionTests
         foreach (var item in results)
         {
             // Verify only requested properties (plus id) are returned
-            Assert.Equal(3, item.Count());
+            Assert.Equal(3, item.Properties().Count());
             Assert.Contains("id", item.Properties().Select(p => p.Name));
             Assert.Contains("Name", item.Properties().Select(p => p.Name));
             Assert.Contains("Age", item.Properties().Select(p => p.Name));
@@ -119,7 +119,7 @@ public class CosmosDbProjectionTests
         foreach (var item in results)
         {
             // Verify only requested properties are returned
-            Assert.Equal(3, item.Count()); // id, Name, Age
+            Assert.Equal(3, item.Properties().Count()); // id, Name, Age
             Assert.Contains("id", item.Properties().Select(p => p.Name));
             Assert.Contains("Name", item.Properties().Select(p => p.Name));
             Assert.Contains("Age", item.Properties().Select(p => p.Name));

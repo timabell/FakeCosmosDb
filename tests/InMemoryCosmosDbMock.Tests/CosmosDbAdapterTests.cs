@@ -113,6 +113,6 @@ public class CosmosDbAdapterTests
         Assert.Equal(19.99, (double)projectionResults.First()["Price"]);
 
         // Verify projection only returned requested fields (plus id)
-        Assert.Equal(3, projectionResults.First().Count()); // id, Name, Price
+        Assert.Equal(3, projectionResults.First().Properties().Count()); // id, Name, Price
     }
 }
