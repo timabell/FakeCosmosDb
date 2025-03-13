@@ -10,6 +10,8 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/yourusername/InMemoryCosmosDbMock</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RootNamespace>TimAbell.MockableCosmos</RootNamespace>
+    <AssemblyName>MockableCosmos</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,8 +1,10 @@
-using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
-public interface ICosmosDbMock
+namespace TimAbell.MockableCosmos;
+
+public interface ICosmosDb
 {
     Task AddContainerAsync(string containerName);
     Task AddItemAsync(string containerName, object entity);

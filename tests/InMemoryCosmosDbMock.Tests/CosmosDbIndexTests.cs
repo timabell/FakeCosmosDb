@@ -1,14 +1,13 @@
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
+namespace TimAbell.MockableCosmos.Tests;
+
 public class CosmosDbIndexTests
 {
-    private readonly InMemoryCosmosDbMock _db = new();
+    private readonly CosmosInMemoryCosmosDb _db = new();
     private readonly string _containerName = "IndexTest";
 
     public CosmosDbIndexTests()

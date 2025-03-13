@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <AssemblyName>MockableCosmosTests</AssemblyName>
+    <RootNamespace>TimAbell.MockableCosmos.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

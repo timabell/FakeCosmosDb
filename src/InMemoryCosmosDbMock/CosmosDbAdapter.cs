@@ -1,16 +1,17 @@
 // Adapter for real CosmosDB
-using Microsoft.Azure.Cosmos;
-using Newtonsoft.Json.Linq;
-using System;
+
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
-public class CosmosDbMockAdapter : ICosmosDbMock
+namespace TimAbell.MockableCosmos;
+
+public class CosmosDbAdapter : ICosmosDb
 {
     private readonly CosmosClient _cosmosClient;
     private readonly string _databaseId;
 
-    public CosmosDbMockAdapter(string connectionString, string databaseId = "TestDb")
+    public CosmosDbAdapter(string connectionString, string databaseId = "TestDb")
     {
         _cosmosClient = new CosmosClient(connectionString);
         _databaseId = databaseId;

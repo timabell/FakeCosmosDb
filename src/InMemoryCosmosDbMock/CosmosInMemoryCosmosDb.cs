@@ -1,9 +1,11 @@
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
-public class InMemoryCosmosDbMock : ICosmosDbMock
+namespace TimAbell.MockableCosmos;
+
+public class CosmosInMemoryCosmosDb : ICosmosDb
 {
     private readonly Dictionary<string, CosmosDbContainer> _containers = new();
 

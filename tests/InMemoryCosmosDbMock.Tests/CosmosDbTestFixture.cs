@@ -1,6 +1,8 @@
+namespace TimAbell.MockableCosmos.Tests;
+
 public class CosmosDbTestFixture : IDisposable
 {
-    public ICosmosDbMock Db { get; }
+    public ICosmosDb Db { get; }
     public string ContainerName = "TestContainer";
 
     public CosmosDbTestFixture(bool useRealCosmos)
@@ -8,12 +10,12 @@ public class CosmosDbTestFixture : IDisposable
         if (useRealCosmos)
         {
             // Use CosmosDB Emulator
-            Db = new CosmosDbMockAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;");
+            Db = new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;");
         }
         else
         {
             // Use In-Memory Mock
-            Db = new InMemoryCosmosDbMock();
+            Db = new CosmosInMemoryCosmosDb();
         }
 
         Db.AddContainerAsync(ContainerName).Wait();

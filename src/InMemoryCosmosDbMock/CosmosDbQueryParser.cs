@@ -1,8 +1,11 @@
 // Query parsing logic
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+
+namespace TimAbell.MockableCosmos;
 
 public class CosmosDbQueryParser
 {

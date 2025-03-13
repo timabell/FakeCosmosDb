@@ -1,11 +1,10 @@
-using Microsoft.Azure.Cosmos;
-using Newtonsoft.Json.Linq;
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-public class CosmosDbMockAdapterTests
+namespace TimAbell.MockableCosmos.Tests;
+
+public class CosmosDbAdapterTests
 {
     private readonly string _containerName = "AdapterTest";
 
@@ -13,7 +12,7 @@ public class CosmosDbMockAdapterTests
     public async Task Adapter_CanBeUsedWithCosmosDbInterface()
     {
         // Arrange
-        var mockAdapter = new CosmosDbMockAdapter();
+        var mockAdapter = new CosmosDbAdapter();
         await mockAdapter.AddContainerAsync(_containerName);
 
         // Act - Add an item
@@ -33,7 +32,7 @@ public class CosmosDbMockAdapterTests
     public async Task Adapter_SupportsPagination()
     {
         // Arrange
-        var mockAdapter = new CosmosDbMockAdapter();
+        var mockAdapter = new CosmosDbAdapter();
         await mockAdapter.AddContainerAsync(_containerName);
 
         // Add 20 items
@@ -71,7 +70,7 @@ public class CosmosDbMockAdapterTests
     public async Task Adapter_HandlesAdvancedQueries()
     {
         // Arrange
-        var mockAdapter = new CosmosDbMockAdapter();
+        var mockAdapter = new CosmosDbAdapter();
         await mockAdapter.AddContainerAsync(_containerName);
 
         // Add test items

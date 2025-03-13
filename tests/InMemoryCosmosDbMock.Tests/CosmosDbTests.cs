@@ -2,17 +2,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
+namespace TimAbell.MockableCosmos.Tests;
+
 public class CosmosDbTests
 {
     public static IEnumerable<object[]> TestConfigurations()
     {
-        yield return new object[] { new InMemoryCosmosDbMock() };
-        yield return new object[] { new CosmosDbMockAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
+        yield return new object[] { new CosmosInMemoryCosmosDb() };
+        yield return new object[] { new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
     }
 
     [Theory]
     [MemberData(nameof(TestConfigurations))]
-    public async Task Can_Insert_And_Query_Item(ICosmosDbMock db)
+    public async Task Can_Insert_And_Query_Item(ICosmosDb db)
     {
         var containerName = "TestContainer";
         await db.AddContainerAsync(containerName);

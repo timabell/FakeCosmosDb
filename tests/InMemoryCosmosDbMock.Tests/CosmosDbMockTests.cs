@@ -1,6 +1,8 @@
+namespace TimAbell.MockableCosmos.Tests;
+
 public class CosmosDbMockTests
 {
-    private readonly InMemoryCosmosDbMock _db = new();
+    private readonly CosmosInMemoryCosmosDb _db = new();
 
     public CosmosDbMockTests()
     {

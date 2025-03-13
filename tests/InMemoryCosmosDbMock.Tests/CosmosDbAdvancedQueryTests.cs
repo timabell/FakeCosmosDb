@@ -1,11 +1,12 @@
-using Newtonsoft.Json.Linq;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
+namespace TimAbell.MockableCosmos.Tests;
+
 public class CosmosDbAdvancedQueryTests
 {
-    private readonly InMemoryCosmosDbMock _db = new();
+    private readonly CosmosInMemoryCosmosDb _db = new();
     private readonly string _containerName = "AdvancedQueryTest";
 
     public CosmosDbAdvancedQueryTests()

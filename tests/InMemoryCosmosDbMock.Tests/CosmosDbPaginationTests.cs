@@ -1,12 +1,12 @@
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
+namespace TimAbell.MockableCosmos.Tests;
+
 public class CosmosDbPaginationTests
 {
-    private readonly InMemoryCosmosDbMock _db = new();
+    private readonly CosmosInMemoryCosmosDb _db = new();
     private readonly string _containerName = "PaginationTest";
 
     public CosmosDbPaginationTests()

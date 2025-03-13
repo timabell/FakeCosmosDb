@@ -1,4 +1,6 @@
 // Indexing logic
+namespace TimAbell.MockableCosmos;
+
 public class CosmosDbIndexManager
 {
     private readonly Dictionary<string, Dictionary<object, HashSet<string>>> _indexes = new();
