@@ -1,4 +1,8 @@
 // Indexing logic
+
+using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
+
 namespace TimAbell.MockableCosmos;
 
 public class CosmosDbIndexManager

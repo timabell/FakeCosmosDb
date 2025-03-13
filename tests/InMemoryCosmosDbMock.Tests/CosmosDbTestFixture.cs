@@ -1,3 +1,5 @@
+using System;
+
 namespace TimAbell.MockableCosmos.Tests;
 
 public class CosmosDbTestFixture : IDisposable

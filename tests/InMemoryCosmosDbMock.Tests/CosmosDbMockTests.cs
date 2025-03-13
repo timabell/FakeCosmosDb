@@ -1,3 +1,7 @@
+using System.Linq;
+using System.Threading.Tasks;
+using Xunit;
+
 namespace TimAbell.MockableCosmos.Tests;
 
 public class CosmosDbMockTests
