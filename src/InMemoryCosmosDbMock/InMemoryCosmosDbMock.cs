@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -27,5 +28,13 @@ public class InMemoryCosmosDbMock : ICosmosDbMock
             throw new InvalidOperationException($"Container '{containerName}' does not exist.");
 
         return _containers[containerName].QueryAsync(sql);
+    }
+
+    public Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null)
+    {
+        if (!_containers.ContainsKey(containerName))
+            throw new InvalidOperationException($"Container '{containerName}' does not exist.");
+
+        return _containers[containerName].QueryWithPaginationAsync(sql, maxItemCount, continuationToken);
     }
 }

@@ -1,8 +1,14 @@
 // Container simulation
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
 public class CosmosDbContainer
 {
     private readonly Dictionary<string, JObject> _store = new();
     private readonly CosmosDbIndexManager _indexManager = new();
+    private readonly CosmosDbPaginationManager _paginationManager = new();
 
     public Task AddAsync(object entity)
     {
@@ -16,6 +22,15 @@ public class CosmosDbContainer
     public Task<IEnumerable<JObject>> QueryAsync(string sql)
     {
         var parsedQuery = CosmosDbQueryParser.Parse(sql);
-        return Task.FromResult(CosmosDbQueryExecutor.Execute(parsedQuery, _store));
+        var results = CosmosDbQueryExecutor.Execute(parsedQuery, _store);
+        return Task.FromResult(results);
+    }
+
+    public Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string sql, int maxItemCount, string continuationToken = null)
+    {
+        var parsedQuery = CosmosDbQueryParser.Parse(sql);
+        var results = CosmosDbQueryExecutor.Execute(parsedQuery, _store);
+        var (pagedResults, nextToken) = _paginationManager.GetPage(results, maxItemCount, continuationToken);
+        return Task.FromResult((pagedResults, nextToken));
     }
 }
