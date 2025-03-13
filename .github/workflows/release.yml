@@ -1,4 +1,3 @@
-// Automated release workflow
 name: Release & Changelog
 
 on:
