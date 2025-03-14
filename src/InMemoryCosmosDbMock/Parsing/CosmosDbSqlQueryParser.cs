@@ -6,18 +6,15 @@ using Microsoft.Extensions.Logging;
 
 namespace TimAbell.MockableCosmos.Parsing;
 
-/// <summary>
-/// Implementation of ICosmosDbQueryParser that uses the Sprache parser combinator library.
-/// </summary>
-public class SpracheSqlQueryParser : ICosmosDbQueryParser
+public class CosmosDbSqlQueryParser
 {
     private readonly ILogger _logger;
 
-    public SpracheSqlQueryParser() : this(null)
+    public CosmosDbSqlQueryParser() : this(null)
     {
     }
 
-    public SpracheSqlQueryParser(ILogger logger)
+    public CosmosDbSqlQueryParser(ILogger logger)
     {
         _logger = logger;
     }
@@ -239,8 +236,8 @@ public class SpracheSqlQueryParser : ICosmosDbQueryParser
         }
         // If it's a binary comparison (=, >, <, etc.), convert to a WhereCondition
         else if (condition is BinaryExpression comparison &&
-                comparison.Operator != BinaryOperator.And &&
-                comparison.Operator != BinaryOperator.Or)
+                 comparison.Operator != BinaryOperator.And &&
+                 comparison.Operator != BinaryOperator.Or)
         {
             if (comparison.Left is PropertyExpression leftProp && comparison.Right is ConstantExpression rightConst)
             {
@@ -289,7 +286,7 @@ public class SpracheSqlQueryParser : ICosmosDbQueryParser
             {
                 PropertyPath = propExpr.PropertyPath,
                 Operator = "=",
-                Value = JToken.FromObject(true)  // Treat as a boolean condition (property = true)
+                Value = JToken.FromObject(true) // Treat as a boolean condition (property = true)
             });
         }
 
@@ -407,4 +404,87 @@ public class SpracheSqlQueryParser : ICosmosDbQueryParser
             }
         }
     }
+}
+
+/// <summary>
+/// Represents a parsed CosmosDB SQL query.
+/// </summary>
+public class ParsedQuery
+{
+    /// <summary>
+    /// The parsed SQL query using the Sprache SQL parser.
+    /// </summary>
+    public CosmosDbSqlQuery SprachedSqlAst { get; set; }
+
+    /// <summary>
+    /// List of property paths to select from the results.
+    /// </summary>
+    public List<string> PropertyPaths { get; set; } = new List<string>();
+
+    /// <summary>
+    /// The name of the container or collection in the FROM clause.
+    /// </summary>
+    public string FromName { get; set; }
+
+    /// <summary>
+    /// The alias used for the FROM source, if any.
+    /// </summary>
+    public string FromAlias { get; set; }
+
+    /// <summary>
+    /// List of conditions in the WHERE clause.
+    /// </summary>
+    public List<WhereCondition> WhereConditions { get; set; } = new List<WhereCondition>();
+
+    /// <summary>
+    /// List of ORDER BY clauses.
+    /// </summary>
+    public List<OrderInfo> OrderBy { get; set; }
+
+    /// <summary>
+    /// LIMIT value, if any.
+    /// </summary>
+    public int Limit { get; set; }
+
+    /// <summary>
+    /// Whether this is a SELECT * query.
+    /// </summary>
+    public bool IsSelectAll => PropertyPaths.Count == 1 && PropertyPaths[0] == "*";
+}
+
+/// <summary>
+/// Represents a condition in a WHERE clause.
+/// </summary>
+public class WhereCondition
+{
+    /// <summary>
+    /// The property path to test.
+    /// </summary>
+    public string PropertyPath { get; set; }
+
+    /// <summary>
+    /// The operator to apply.
+    /// </summary>
+    public string Operator { get; set; }
+
+    /// <summary>
+    /// The value to compare with.
+    /// </summary>
+    public JToken Value { get; set; }
+}
+
+/// <summary>
+/// Represents an ORDER BY clause.
+/// </summary>
+public class OrderInfo
+{
+    /// <summary>
+    /// The property path to order by.
+    /// </summary>
+    public string PropertyPath { get; set; }
+
+    /// <summary>
+    /// The direction to order in (ASC or DESC).
+    /// </summary>
+    public string Direction { get; set; } = "ASC";
 }

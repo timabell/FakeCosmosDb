@@ -57,7 +57,7 @@ namespace InMemoryCosmosDbMock.Tests
         {
             // Arrange
             var logger = new TestLogger(_output);
-            var parser = new SpracheSqlQueryParser(logger);
+            var parser = new CosmosDbSqlQueryParser(logger);
             var cosmosDb = new CosmosInMemoryCosmosDb(parser, logger);
 
             // Create a container and add some test data

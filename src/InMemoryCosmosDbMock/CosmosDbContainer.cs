@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using TimAbell.MockableCosmos.Parsing;
 
 namespace TimAbell.MockableCosmos;
 
@@ -13,7 +14,7 @@ public class CosmosDbContainer
     private readonly List<JObject> _store = new List<JObject>();
     private readonly ICosmosDbIndexManager _indexManager = new CosmosDbIndexManager();
     private readonly ICosmosDbPaginationManager _paginationManager = new CosmosDbPaginationManager();
-    private readonly ICosmosDbQueryParser _queryParser = new CosmosDbQueryParser();
+    private readonly CosmosDbSqlQueryParser _queryParser = new CosmosDbSqlQueryParser();
 
     // Add a property to access the store
     public List<JObject> Documents => _store;

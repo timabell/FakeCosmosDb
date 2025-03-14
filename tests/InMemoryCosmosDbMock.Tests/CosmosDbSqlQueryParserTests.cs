@@ -8,9 +8,9 @@ using Xunit.Abstractions;
 
 namespace InMemoryCosmosDbMock.Tests;
 
-public class SpracheSqlQueryParserTests(ITestOutputHelper output)
+public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 {
-    private readonly ICosmosDbQueryParser _parser = new SpracheSqlQueryParser();
+    private readonly CosmosDbSqlQueryParser _parser = new CosmosDbSqlQueryParser();
 
     [Fact]
     public void ShouldParseSimpleSelectQuery()
@@ -193,7 +193,7 @@ public class SpracheSqlQueryParserTests(ITestOutputHelper output)
     public void ShouldHandleQuotedStringsInWhereConditions()
     {
         // Arrange
-        var parser = new SpracheSqlQueryParser();
+        var parser = new CosmosDbSqlQueryParser();
         var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
         // Act
@@ -213,7 +213,7 @@ public class SpracheSqlQueryParserTests(ITestOutputHelper output)
     public void ShouldHandleIntegrationTestQuery()
     {
         // This exact query is used in the integration test
-        var parser = new SpracheSqlQueryParser();
+        var parser = new CosmosDbSqlQueryParser();
         var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
         // Act

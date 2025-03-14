@@ -11,19 +11,19 @@ namespace TimAbell.MockableCosmos;
 public class CosmosInMemoryCosmosDb : ICosmosDb
 {
     private readonly Dictionary<string, CosmosDbContainer> _containers = new();
-    private readonly ICosmosDbQueryParser _queryParser;
+    private readonly CosmosDbSqlQueryParser _queryParser;
     private readonly ILogger _logger;
 
     public CosmosInMemoryCosmosDb()
     {
-        _queryParser = new SpracheSqlQueryParser();
+        _queryParser = new CosmosDbSqlQueryParser();
     }
-    public CosmosInMemoryCosmosDb(ICosmosDbQueryParser queryParser)
+    public CosmosInMemoryCosmosDb(CosmosDbSqlQueryParser queryParser)
         : this(queryParser, null)
     {
     }
 
-    public CosmosInMemoryCosmosDb(ICosmosDbQueryParser queryParser, ILogger logger)
+    public CosmosInMemoryCosmosDb(CosmosDbSqlQueryParser queryParser, ILogger logger)
     {
         _queryParser = queryParser;
         _logger = logger;
