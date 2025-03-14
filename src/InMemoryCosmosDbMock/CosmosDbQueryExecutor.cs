@@ -58,6 +58,17 @@ public class CosmosDbQueryExecutor
             foreach (var property in properties)
             {
                 var propertyPath = property.Trim();
+
+                // Skip the alias part (c.Name -> Name)
+                if (propertyPath.Contains("."))
+                {
+                    var parts = propertyPath.Split('.');
+                    if (parts.Length == 2 && parts[0] == "c")
+                    {
+                        propertyPath = parts[1];
+                    }
+                }
+
                 var value = GetPropertyValue(item, propertyPath);
 
                 if (value != null)
@@ -96,13 +107,13 @@ public class CosmosDbQueryExecutor
     private static bool ApplyWhere(JObject entity, string condition)
     {
         // Handle CONTAINS function
-        if (condition.Contains("CONTAINS("))
+        if (condition.Contains("CONTAINS(", StringComparison.OrdinalIgnoreCase))
         {
             return HandleContainsFunction(entity, condition);
         }
 
         // Handle STARTSWITH function
-        if (condition.Contains("STARTSWITH("))
+        if (condition.Contains("STARTSWITH(", StringComparison.OrdinalIgnoreCase))
         {
             return HandleStartsWithFunction(entity, condition);
         }
@@ -113,6 +124,12 @@ public class CosmosDbQueryExecutor
             var parts = condition.Split('=');
             var field = parts[0].Trim();
             var value = parts[1].Trim().Trim('\'', '"');
+
+            // Handle the 'c.' prefix in field paths
+            if (field.StartsWith("c."))
+            {
+                field = field.Substring(2);
+            }
 
             return string.Equals(
                 GetPropertyValue(entity, field)?.ToString(),
@@ -127,6 +144,12 @@ public class CosmosDbQueryExecutor
             var parts = condition.Split('>');
             var field = parts[0].Trim();
             var value = parts[1].Trim().Trim('\'', '"');
+
+            // Handle the 'c.' prefix in field paths
+            if (field.StartsWith("c."))
+            {
+                field = field.Substring(2);
+            }
 
             var propValue = GetPropertyValue(entity, field);
             if (propValue == null) return false;
@@ -145,6 +168,12 @@ public class CosmosDbQueryExecutor
             var parts = condition.Split('<');
             var field = parts[0].Trim();
             var value = parts[1].Trim().Trim('\'', '"');
+
+            // Handle the 'c.' prefix in field paths
+            if (field.StartsWith("c."))
+            {
+                field = field.Substring(2);
+            }
 
             var propValue = GetPropertyValue(entity, field);
             if (propValue == null) return false;
@@ -171,8 +200,16 @@ public class CosmosDbQueryExecutor
         var field = parameters[0].Trim();
         var searchValue = parameters[1].Trim().Trim('\'', '"');
 
+        // Handle the 'c.' prefix in field paths
+        if (field.StartsWith("c."))
+        {
+            field = field.Substring(2);
+        }
+
         var propValue = GetPropertyValue(entity, field);
-        return propValue?.ToString().IndexOf(searchValue, StringComparison.OrdinalIgnoreCase) >= 0;
+        if (propValue == null) return false;
+
+        return propValue.ToString().IndexOf(searchValue, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static bool HandleStartsWithFunction(JObject entity, string condition)
@@ -186,13 +223,21 @@ public class CosmosDbQueryExecutor
         var field = parameters[0].Trim();
         var searchValue = parameters[1].Trim().Trim('\'', '"');
 
+        // Handle the 'c.' prefix in field paths
+        if (field.StartsWith("c."))
+        {
+            field = field.Substring(2);
+        }
+
         var propValue = GetPropertyValue(entity, field);
-        return propValue?.ToString().StartsWith(searchValue, StringComparison.OrdinalIgnoreCase) ?? false;
+        if (propValue == null) return false;
+
+        return propValue.ToString().StartsWith(searchValue, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ExtractFunctionContent(string condition, string functionName)
     {
-        var startIndex = condition.IndexOf(functionName + "(") + functionName.Length + 1;
+        var startIndex = condition.IndexOf(functionName + "(", StringComparison.OrdinalIgnoreCase) + functionName.Length + 1;
         var endIndex = condition.IndexOf(')', startIndex);
         return condition.Substring(startIndex, endIndex - startIndex);
     }
@@ -207,15 +252,26 @@ public class CosmosDbQueryExecutor
         if (string.IsNullOrEmpty(propertyPath))
             return null;
 
+        // Handle 'c.' prefix
+        if (propertyPath.StartsWith("c."))
+        {
+            propertyPath = propertyPath.Substring(2);
+        }
+
         // Handle nested properties with dot notation (e.g., "address.city")
         var parts = propertyPath.Split('.');
         JToken current = entity;
 
         foreach (var part in parts)
         {
-            current = current[part];
             if (current == null)
                 return null;
+
+            // Check if the property exists
+            if (current.Type == JTokenType.Object && !((JObject)current).ContainsKey(part))
+                return null;
+
+            current = current[part];
         }
 
         return current;
