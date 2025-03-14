@@ -391,12 +391,26 @@ public class CosmosDbQueryExecutor
 		{
 			var projectedItem = new JObject();
 
+			// Always include the 'id' field if it exists in the original document
+			if (item["id"] != null)
+			{
+				projectedItem["id"] = item["id"];
+			}
+
 			foreach (var path in propertyPaths)
 			{
+				// Remove the FROM alias (like 'c.') if present at the beginning of the path
+				string processedPath = path;
+				if (path.Contains('.') && (path.StartsWith("c.") || path.StartsWith("r.")))
+				{
+					// Skip the alias (e.g., "c.") part
+					processedPath = path.Substring(path.IndexOf('.') + 1);
+				}
+
 				var propValue = GetPropertyByPath(item, path);
 				if (propValue != null)
 				{
-					SetPropertyByPath(projectedItem, path, propValue);
+					SetPropertyByPath(projectedItem, processedPath, propValue);
 				}
 			}
 

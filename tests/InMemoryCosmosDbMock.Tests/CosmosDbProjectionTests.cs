@@ -1,5 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
+using FluentAssertions;
+using FluentAssertions.Execution;
 using InMemoryCosmosDbMock.Tests.Utilities;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -12,11 +14,13 @@ public class CosmosDbProjectionTests
 	private readonly CosmosInMemoryCosmosDb _db;
 	private readonly string _containerName = "ProjectionTest";
 	private readonly ITestOutputHelper _output;
+	private readonly ILogger _logger;
 
 	public CosmosDbProjectionTests(ITestOutputHelper output)
 	{
 		_output = output;
-		_db = new CosmosInMemoryCosmosDb(new TestLogger(output));
+		_logger = new TestLogger(output);
+		_db = new CosmosInMemoryCosmosDb(_logger);
 		_db.AddContainerAsync(_containerName).Wait();
 		SeedTestData().Wait();
 	}
@@ -86,20 +90,48 @@ public class CosmosDbProjectionTests
 		var results = await _db.QueryAsync(_containerName, "SELECT c.Name, c.Address.City FROM c");
 
 		// Should return 3 items with Name and Address.City
-		Assert.Equal(3, results.Count());
+		results.Should().HaveCount(3, because: "we have 3 documents in the test container");
 
+		// Log all results for debugging
 		foreach (var item in results)
 		{
-			// Verify Name property is included
-			Assert.Contains("Name", item.Properties().Select(p => p.Name));
+			_logger?.LogInformation("Result item: {Item}", item.ToString());
+		}
 
-			// Verify Address property is included and has City
-			Assert.Contains("Address", item.Properties().Select(p => p.Name));
-			Assert.NotNull(item["Address"]["City"]);
+		// Check each result using AssertionScope to see all issues at once
+		int index = 0;
+		foreach (var item in results)
+		{
+			using (new AssertionScope($"Item at index {index++}"))
+			{
+				// Expected properties
+				item.Should().ContainKey("id", because: "'id' should always be included");
+				item.Should().ContainKey("Name", because: "it was requested in the SELECT clause");
+				item.Should().ContainKey("Address", because: "Address.City was requested in the SELECT clause");
 
-			// Verify other Address properties are not included
-			Assert.Null(item["Address"]["ZipCode"]);
-			Assert.Null(item["Address"]["Country"]);
+				// Verify other properties are NOT included
+				item.Should().NotContainKey("Email", because: "it wasn't requested in the projection");
+				item.Should().NotContainKey("Age", because: "it wasn't requested in the projection");
+				item.Should().NotContainKey("Tags", because: "it wasn't requested in the projection");
+
+				// Check Address structure
+				if (item.ContainsKey("Address"))
+				{
+					var address = item["Address"];
+					address.Should().NotBeNull();
+					address.Should().BeOfType<Newtonsoft.Json.Linq.JObject>();
+
+					// Use another nested AssertionScope for the Address object
+					using (new AssertionScope("Address property"))
+					{
+						var addressObj = address as Newtonsoft.Json.Linq.JObject;
+						addressObj.Should().ContainKey("City", because: "it was requested in the SELECT clause");
+						addressObj.Should().NotContainKey("Street", because: "it wasn't requested in the projection");
+						addressObj.Should().NotContainKey("ZipCode", because: "it wasn't requested in the projection");
+						addressObj.Should().NotContainKey("Country", because: "it wasn't requested in the projection");
+					}
+				}
+			}
 		}
 	}
 
