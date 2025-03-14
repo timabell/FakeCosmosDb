@@ -49,6 +49,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Applying WHERE from AST");
 			}
+
 			filtered = filtered.Where(e => ApplyWhere(e, query.SprachedSqlAst.Where.Condition));
 		}
 		else if (query.WhereConditions != null && query.WhereConditions.Count > 0)
@@ -84,6 +85,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Applying ORDER BY from AST");
 			}
+
 			foreach (var orderByItem in query.SprachedSqlAst.OrderBy.Items)
 			{
 				if (_logger != null)
@@ -91,6 +93,7 @@ public class CosmosDbQueryExecutor
 					_logger.LogDebug("ORDER BY {property} {direction}",
 						orderByItem.PropertyPath, orderByItem.Descending ? "DESC" : "ASC");
 				}
+
 				if (orderByItem.Descending)
 				{
 					filtered = filtered.OrderByDescending(e => GetPropertyValue(e, orderByItem.PropertyPath));
@@ -107,12 +110,14 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Applying ORDER BY from ParsedQuery.OrderBy");
 			}
+
 			foreach (var orderBy in query.OrderBy)
 			{
 				if (_logger != null)
 				{
 					_logger.LogDebug("ORDER BY {property} {direction}", orderBy.PropertyPath, orderBy.Direction);
 				}
+
 				if (orderBy.Direction == SortDirection.Descending)
 				{
 					filtered = filtered.OrderByDescending(e => GetPropertyValue(e, orderBy.PropertyPath));
@@ -137,6 +142,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Applying LIMIT {limit} from AST", query.SprachedSqlAst.Limit.Value);
 			}
+
 			results = results.Take(query.SprachedSqlAst.Limit.Value).ToList();
 		}
 		else if (query.Limit > 0)
@@ -145,6 +151,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Applying LIMIT {limit} from ParsedQuery.Limit", query.Limit);
 			}
+
 			results = results.Take(query.Limit).ToList();
 		}
 
@@ -161,6 +168,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Applying projection from AST for properties: {properties}", string.Join(", ", properties));
 			}
+
 			return ApplyProjection(results, properties);
 		}
 		else if (query.PropertyPaths != null && query.PropertyPaths.Count > 0 && !query.PropertyPaths.Contains("*"))
@@ -169,6 +177,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Applying projection for properties: {properties}", string.Join(", ", query.PropertyPaths));
 			}
+
 			return ApplyProjection(results, query.PropertyPaths);
 		}
 
@@ -218,6 +227,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Property value is null, condition fails");
 			}
+
 			return false;
 		}
 
@@ -261,6 +271,7 @@ public class CosmosDbQueryExecutor
 				{
 					_logger.LogError(ex, "Error extracting condition value: {message}", ex.Message);
 				}
+
 				return false;
 			}
 		}
@@ -285,6 +296,7 @@ public class CosmosDbQueryExecutor
 						_logger.LogDebug("String equality check: '{property}' = '{value}' => {result}",
 							propStringValue, stringValue, result);
 					}
+
 					return result;
 				}
 
@@ -294,6 +306,7 @@ public class CosmosDbQueryExecutor
 					_logger.LogDebug("Deep equality check: '{property}' = '{value}' => {result}",
 						propertyValue.ToString(), conditionObj?.ToString() ?? "null", equality);
 				}
+
 				return equality;
 
 			case ComparisonOperator.NotEquals:
@@ -316,6 +329,7 @@ public class CosmosDbQueryExecutor
 				{
 					return propertyValue.Value<string>().IndexOf(containsValue, StringComparison.OrdinalIgnoreCase) >= 0;
 				}
+
 				return false;
 
 			case ComparisonOperator.StringStartsWith:
@@ -323,6 +337,7 @@ public class CosmosDbQueryExecutor
 				{
 					return propertyValue.Value<string>().StartsWith(startsWithValue, StringComparison.OrdinalIgnoreCase);
 				}
+
 				return false;
 
 			default:
@@ -330,6 +345,7 @@ public class CosmosDbQueryExecutor
 				{
 					_logger.LogWarning("Unsupported operator: {operator}", op);
 				}
+
 				return false;
 		}
 	}
@@ -341,29 +357,19 @@ public class CosmosDbQueryExecutor
 			return 0;
 		}
 
-		try
+		if (token.Type == JTokenType.Integer && value is int intValue)
 		{
-			if (token.Type == JTokenType.Integer && value is int intValue)
-			{
-				return token.Value<int>().CompareTo(intValue);
-			}
-			else if (token.Type == JTokenType.Float && value is double doubleValue)
-			{
-				return token.Value<double>().CompareTo(doubleValue);
-			}
-			else if (token.Type == JTokenType.String && value is string stringValue)
-			{
-				return string.Compare(token.Value<string>(), stringValue, StringComparison.OrdinalIgnoreCase);
-			}
-			// Add more comparisons as needed
+			return token.Value<int>().CompareTo(intValue);
 		}
-		catch (Exception ex)
+		else if (token.Type == JTokenType.Float && value is double doubleValue)
 		{
-			if (_logger != null)
-			{
-				_logger.LogError(ex, "Error comparing values: {message}", ex.Message);
-			}
+			return token.Value<double>().CompareTo(doubleValue);
 		}
+		else if (token.Type == JTokenType.String && value is string stringValue)
+		{
+			return string.Compare(token.Value<string>(), stringValue, StringComparison.OrdinalIgnoreCase);
+		}
+		// Add more comparisons as needed
 
 		return 0;
 	}
@@ -408,6 +414,7 @@ public class CosmosDbQueryExecutor
 			_logger.LogDebug("GetPropertyValue for path '{path}' returned: {value}",
 				propertyPath, token?.ToString() ?? "null");
 		}
+
 		return token?.Value<object>();
 	}
 
@@ -473,6 +480,7 @@ public class CosmosDbQueryExecutor
 			{
 				current[part] = new JObject();
 			}
+
 			current = (JObject)current[part];
 		}
 
@@ -631,9 +639,11 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("JValue string comparison: '{left}' = '{right}'", leftStr, rightStr);
 							}
+
 							return string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
 						}
 					}
+
 					return Equals(leftValue, rightValue);
 
 				case BinaryOperator.NotEqual:
@@ -651,9 +661,11 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("JValue string not-equals comparison: '{left}' != '{right}'", leftStr, rightStr);
 							}
+
 							return !string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
 						}
 					}
+
 					return !Equals(leftValue, rightValue);
 
 				case BinaryOperator.GreaterThan:
@@ -687,6 +699,7 @@ public class CosmosDbQueryExecutor
 			{
 				return boolValue;
 			}
+
 			return value != null;
 		}
 
@@ -723,6 +736,7 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Property '{path}' value: '{value}' (Type: {type})",
 					prop.PropertyPath, propValue?.ToString() ?? "null", propValue?.GetType().Name ?? "null");
 			}
+
 			return propValue;
 		}
 
@@ -732,6 +746,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Evaluating function: {name}", func.FunctionName);
 			}
+
 			return EvaluateFunction(item, func);
 		}
 
