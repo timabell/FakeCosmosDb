@@ -15,7 +15,7 @@ public class CosmosDbTestFixture : IDisposable
 	public CosmosDbTestFixture(bool useRealCosmos, ITestOutputHelper output = null)
 	{
 		_logger = output != null ? new TestLogger(output) : null;
-		
+
 		if (useRealCosmos)
 		{
 			// Use CosmosDB Emulator

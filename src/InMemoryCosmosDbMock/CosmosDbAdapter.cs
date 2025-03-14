@@ -23,9 +23,9 @@ public class CosmosDbAdapter : ICosmosDb
 	{
 		_logger = logger;
 		_databaseId = databaseId;
-		
+
 		_logger?.LogInformation("Initializing CosmosClient with connection to {databaseId}", databaseId);
-		_cosmosClient = clientOptions != null 
+		_cosmosClient = clientOptions != null
 			? new CosmosClient(connectionString, clientOptions)
 			: new CosmosClient(connectionString);
 	}
@@ -65,7 +65,7 @@ public class CosmosDbAdapter : ICosmosDb
 	{
 		_logger?.LogInformation("Executing paginated query on container {containerName}: {sql}", containerName, sql);
 		_logger?.LogInformation("Max items: {maxItemCount}, Continuation token: {continuationToken}", maxItemCount, continuationToken ?? "null");
-		
+
 		var container = _cosmosClient.GetContainer(_databaseId, containerName);
 		var queryDefinition = new QueryDefinition(sql);
 
@@ -82,8 +82,8 @@ public class CosmosDbAdapter : ICosmosDb
 
 		// Read the next page
 		var response = await iterator.ReadNextAsync();
-		
-		_logger?.LogInformation("Query returned {count} results with continuation token: {token}", 
+
+		_logger?.LogInformation("Query returned {count} results with continuation token: {token}",
 			response.Count, response.ContinuationToken ?? "null");
 
 		return (response, response.ContinuationToken);

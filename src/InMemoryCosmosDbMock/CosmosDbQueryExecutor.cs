@@ -386,26 +386,57 @@ public class CosmosDbQueryExecutor
 
 	private object GetPropertyValue(JObject item, string propertyPath)
 	{
-		return GetPropertyByPath(item, propertyPath)?.Value<object>();
+		var token = GetPropertyByPath(item, propertyPath);
+		if (_logger != null)
+		{
+			_logger.LogDebug("GetPropertyValue for path '{path}' returned: {value}",
+				propertyPath, token?.ToString() ?? "null");
+		}
+		return token?.Value<object>();
 	}
 
 	private JToken GetPropertyByPath(JObject item, string path)
 	{
+		if (string.IsNullOrEmpty(path))
+		{
+			return null;
+		}
+
+		// Special case for * to return the entire object
+		if (path == "*")
+		{
+			return item;
+		}
+
 		var parts = path.Split('.');
 		JToken current = item;
 
-		foreach (var part in parts)
+		// Skip the first part if it's the FROM alias
+		int startIndex = 0;
+		if (parts.Length > 1 && (parts[0] == "c" || parts[0] == "r")) // Common FROM aliases are 'c' and 'r'
 		{
+			startIndex = 1;
+			if (_logger != null)
+			{
+				_logger.LogDebug("Skipping FROM alias '{alias}' in property path", parts[0]);
+			}
+		}
+
+		// Navigate through the path parts
+		for (int i = startIndex; i < parts.Length; i++)
+		{
+			if (current == null)
+			{
+				return null;
+			}
+
 			if (current is JObject obj)
 			{
-				current = obj[part];
-				if (current == null)
-				{
-					return null;
-				}
+				current = obj[parts[i]];
 			}
 			else
 			{
+				// Can't navigate further
 				return null;
 			}
 		}
@@ -579,18 +610,38 @@ public class CosmosDbQueryExecutor
 
 	private object EvaluateValue(JObject item, Expression expression)
 	{
+		if (_logger != null)
+		{
+			_logger.LogDebug("Evaluating expression of type: {type}", expression.GetType().Name);
+		}
+
 		if (expression is ConstantExpression constant)
 		{
+			if (_logger != null)
+			{
+				_logger.LogDebug("Constant value: '{value}' (Type: {type})", constant.Value?.ToString() ?? "null", constant.Value?.GetType().Name ?? "null");
+			}
+
 			return constant.Value;
 		}
 
 		if (expression is PropertyExpression prop)
 		{
-			return GetPropertyValue(item, prop.PropertyPath);
+			var propValue = GetPropertyValue(item, prop.PropertyPath);
+			if (_logger != null)
+			{
+				_logger.LogDebug("Property '{path}' value: '{value}' (Type: {type})",
+					prop.PropertyPath, propValue?.ToString() ?? "null", propValue?.GetType().Name ?? "null");
+			}
+			return propValue;
 		}
 
 		if (expression is FunctionCallExpression func)
 		{
+			if (_logger != null)
+			{
+				_logger.LogDebug("Evaluating function: {name}", func.FunctionName);
+			}
 			return EvaluateFunction(item, func);
 		}
 
