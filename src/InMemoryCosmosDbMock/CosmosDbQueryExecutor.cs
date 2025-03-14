@@ -43,6 +43,7 @@ public class CosmosDbQueryExecutor
     private static IEnumerable<JObject> ApplyProjection(IEnumerable<JObject> results, IEnumerable<string> properties)
     {
         var projectedResults = new List<JObject>();
+        var propertyPaths = properties.ToList();
 
         foreach (var item in results)
         {
@@ -55,45 +56,73 @@ public class CosmosDbQueryExecutor
             }
 
             // Add requested properties
-            foreach (var property in properties)
+            foreach (var propertyPath in propertyPaths)
             {
-                var propertyPath = property.Trim();
+                string normalizedPath = propertyPath.Trim();
 
-                // Skip the alias part (c.Name -> Name)
-                if (propertyPath.Contains("."))
+                // Handle alias references (c.Name -> Name, c.Address.City -> Address.City)
+                if (normalizedPath.StartsWith("c."))
                 {
-                    var parts = propertyPath.Split('.');
-                    if (parts.Length == 2 && parts[0] == "c")
-                    {
-                        propertyPath = parts[1];
-                    }
+                    normalizedPath = normalizedPath.Substring(2);
                 }
 
-                var value = GetPropertyValue(item, propertyPath);
-
-                if (value != null)
+                if (normalizedPath.Contains("."))
                 {
-                    // Handle nested properties with dot notation
-                    if (propertyPath.Contains("."))
-                    {
-                        var parts = propertyPath.Split('.');
-                        var currentObj = projectedItem;
+                    // This is a nested property path like Address.City
+                    var pathParts = normalizedPath.Split('.');
+                    var rootProperty = pathParts[0];
 
-                        for (int i = 0; i < parts.Length - 1; i++)
+                    // Get the source root property (e.g., Address)
+                    var sourceProperty = item[rootProperty];
+                    if (sourceProperty != null)
+                    {
+                        // If this is the first time we're adding this root property
+                        if (!projectedItem.ContainsKey(rootProperty))
                         {
-                            var part = parts[i];
-                            if (!currentObj.ContainsKey(part))
-                            {
-                                currentObj[part] = new JObject();
-                            }
-                            currentObj = (JObject)currentObj[part];
+                            projectedItem[rootProperty] = new JObject();
                         }
 
-                        currentObj[parts[^1]] = JToken.FromObject(value);
+                        // Navigate to the nested property (e.g., City)
+                        var targetProperty = projectedItem[rootProperty] as JObject;
+                        var currentSource = sourceProperty;
+
+                        // For paths like Address.SubAddress.City
+                        for (int i = 1; i < pathParts.Length - 1; i++)
+                        {
+                            var part = pathParts[i];
+                            currentSource = currentSource[part];
+
+                            if (currentSource == null)
+                                break;
+
+                            if (!targetProperty.ContainsKey(part))
+                            {
+                                targetProperty[part] = new JObject();
+                            }
+
+                            targetProperty = targetProperty[part] as JObject;
+                        }
+
+                        // Set the final property value if we still have a valid source
+                        if (currentSource != null)
+                        {
+                            var finalPart = pathParts[pathParts.Length - 1];
+                            var finalValue = currentSource[finalPart];
+
+                            if (finalValue != null)
+                            {
+                                targetProperty[finalPart] = finalValue;
+                            }
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    // This is a simple property
+                    var value = item[normalizedPath];
+                    if (value != null)
                     {
-                        projectedItem[propertyPath] = JToken.FromObject(value);
+                        projectedItem[normalizedPath] = value;
                     }
                 }
             }
