@@ -4,40 +4,61 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using TimAbell.MockableCosmos.Parsing;
 
 namespace TimAbell.MockableCosmos;
 
 public class CosmosDbQueryExecutor
 {
-    public static IEnumerable<JObject> Execute(ParsedQuery query, Dictionary<string, JObject> store)
+    public static IEnumerable<JObject> Execute(ParsedQuery query, List<JObject> store)
     {
-        var filtered = store.Values.AsQueryable();
+        var filtered = store.AsQueryable();
 
-        if (query.WhereClause != null)
+        // Apply WHERE if specified
+        if (query.SprachedSqlAst?.Where != null)
         {
-            filtered = filtered.Where(e => ApplyWhere(e, query.WhereClause));
+            filtered = filtered.Where(e => ApplyWhere(e, query.SprachedSqlAst.Where.Condition));
         }
 
-        if (query.OrderBy != null)
+        // Apply ORDER BY if specified
+        if (query.SprachedSqlAst?.OrderBy != null && query.SprachedSqlAst.OrderBy.Items.Count > 0)
         {
-            filtered = filtered.OrderBy(e => GetPropertyValue(e, query.OrderBy));
+            foreach (var orderByItem in query.SprachedSqlAst.OrderBy.Items)
+            {
+                if (orderByItem.Descending)
+                {
+                    filtered = filtered.OrderByDescending(e => GetPropertyValue(e, orderByItem.PropertyPath));
+                }
+                else
+                {
+                    filtered = filtered.OrderBy(e => GetPropertyValue(e, orderByItem.PropertyPath));
+                }
+            }
         }
 
         var results = filtered.ToList();
 
         // Apply LIMIT if specified
-        if (query.Limit.HasValue)
+        if (query.SprachedSqlAst?.Limit != null)
         {
-            results = results.Take(query.Limit.Value).ToList();
+            results = results.Take(query.SprachedSqlAst.Limit.Value).ToList();
         }
 
         // Apply SELECT projection if not SELECT *
-        if (!query.IsSelectAll)
+        if (query.SprachedSqlAst?.Select != null && !query.SprachedSqlAst.Select.IsSelectAll)
         {
-            return ApplyProjection(results, query.GetSelectedProperties());
+            return ApplyProjection(results, GetSelectedProperties(query.SprachedSqlAst.Select));
         }
 
         return results;
+    }
+
+    private static IEnumerable<string> GetSelectedProperties(SelectClause selectClause)
+    {
+        return selectClause.Items
+            .OfType<PropertySelectItem>()
+            .Select(item => item.PropertyPath)
+            .ToList();
     }
 
     private static IEnumerable<JObject> ApplyProjection(IEnumerable<JObject> results, IEnumerable<string> properties)
@@ -49,81 +70,12 @@ public class CosmosDbQueryExecutor
         {
             var projectedItem = new JObject();
 
-            // Always include id property for consistency
-            if (item.ContainsKey("id"))
+            foreach (var path in propertyPaths)
             {
-                projectedItem["id"] = item["id"];
-            }
-
-            // Add requested properties
-            foreach (var propertyPath in propertyPaths)
-            {
-                string normalizedPath = propertyPath.Trim();
-
-                // Handle alias references (c.Name -> Name, c.Address.City -> Address.City)
-                if (normalizedPath.StartsWith("c."))
+                var propValue = GetPropertyByPath(item, path);
+                if (propValue != null)
                 {
-                    normalizedPath = normalizedPath.Substring(2);
-                }
-
-                if (normalizedPath.Contains("."))
-                {
-                    // This is a nested property path like Address.City
-                    var pathParts = normalizedPath.Split('.');
-                    var rootProperty = pathParts[0];
-
-                    // Get the source root property (e.g., Address)
-                    var sourceProperty = item[rootProperty];
-                    if (sourceProperty != null)
-                    {
-                        // If this is the first time we're adding this root property
-                        if (!projectedItem.ContainsKey(rootProperty))
-                        {
-                            projectedItem[rootProperty] = new JObject();
-                        }
-
-                        // Navigate to the nested property (e.g., City)
-                        var targetProperty = projectedItem[rootProperty] as JObject;
-                        var currentSource = sourceProperty;
-
-                        // For paths like Address.SubAddress.City
-                        for (int i = 1; i < pathParts.Length - 1; i++)
-                        {
-                            var part = pathParts[i];
-                            currentSource = currentSource[part];
-
-                            if (currentSource == null)
-                                break;
-
-                            if (!targetProperty.ContainsKey(part))
-                            {
-                                targetProperty[part] = new JObject();
-                            }
-
-                            targetProperty = targetProperty[part] as JObject;
-                        }
-
-                        // Set the final property value if we still have a valid source
-                        if (currentSource != null)
-                        {
-                            var finalPart = pathParts[pathParts.Length - 1];
-                            var finalValue = currentSource[finalPart];
-
-                            if (finalValue != null)
-                            {
-                                targetProperty[finalPart] = finalValue;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    // This is a simple property
-                    var value = item[normalizedPath];
-                    if (value != null)
-                    {
-                        projectedItem[normalizedPath] = value;
-                    }
+                    SetPropertyByPath(projectedItem, path, propValue);
                 }
             }
 
@@ -133,176 +85,191 @@ public class CosmosDbQueryExecutor
         return projectedResults;
     }
 
-    private static bool ApplyWhere(JObject entity, string condition)
+    private static object GetPropertyValue(JObject item, string propertyPath)
     {
-        // Handle CONTAINS function
-        if (condition.Contains("CONTAINS(", StringComparison.OrdinalIgnoreCase))
-        {
-            return HandleContainsFunction(entity, condition);
-        }
-
-        // Handle STARTSWITH function
-        if (condition.Contains("STARTSWITH(", StringComparison.OrdinalIgnoreCase))
-        {
-            return HandleStartsWithFunction(entity, condition);
-        }
-
-        // Handle basic equality
-        if (condition.Contains("="))
-        {
-            var parts = condition.Split('=');
-            var field = parts[0].Trim();
-            var value = parts[1].Trim().Trim('\'', '"');
-
-            // Handle the 'c.' prefix in field paths
-            if (field.StartsWith("c."))
-            {
-                field = field.Substring(2);
-            }
-
-            return string.Equals(
-                GetPropertyValue(entity, field)?.ToString(),
-                value,
-                StringComparison.OrdinalIgnoreCase
-            );
-        }
-
-        // Handle greater than
-        if (condition.Contains(">"))
-        {
-            var parts = condition.Split('>');
-            var field = parts[0].Trim();
-            var value = parts[1].Trim().Trim('\'', '"');
-
-            // Handle the 'c.' prefix in field paths
-            if (field.StartsWith("c."))
-            {
-                field = field.Substring(2);
-            }
-
-            var propValue = GetPropertyValue(entity, field);
-            if (propValue == null) return false;
-
-            if (double.TryParse(value, out var numericValue) && double.TryParse(propValue.ToString(), out var propNumericValue))
-            {
-                return propNumericValue > numericValue;
-            }
-
-            return string.Compare(propValue.ToString(), value, StringComparison.OrdinalIgnoreCase) > 0;
-        }
-
-        // Handle less than
-        if (condition.Contains("<"))
-        {
-            var parts = condition.Split('<');
-            var field = parts[0].Trim();
-            var value = parts[1].Trim().Trim('\'', '"');
-
-            // Handle the 'c.' prefix in field paths
-            if (field.StartsWith("c."))
-            {
-                field = field.Substring(2);
-            }
-
-            var propValue = GetPropertyValue(entity, field);
-            if (propValue == null) return false;
-
-            if (double.TryParse(value, out var numericValue) && double.TryParse(propValue.ToString(), out var propNumericValue))
-            {
-                return propNumericValue < numericValue;
-            }
-
-            return string.Compare(propValue.ToString(), value, StringComparison.OrdinalIgnoreCase) < 0;
-        }
-
-        return false;
+        return GetPropertyByPath(item, propertyPath)?.Value<object>();
     }
 
-    private static bool HandleContainsFunction(JObject entity, string condition)
+    private static JToken GetPropertyByPath(JObject item, string path)
     {
-        // Extract parameters from CONTAINS(field, value)
-        var functionContent = ExtractFunctionContent(condition, "CONTAINS");
-        var parameters = SplitFunctionParameters(functionContent);
-
-        if (parameters.Length != 2) return false;
-
-        var field = parameters[0].Trim();
-        var searchValue = parameters[1].Trim().Trim('\'', '"');
-
-        // Handle the 'c.' prefix in field paths
-        if (field.StartsWith("c."))
-        {
-            field = field.Substring(2);
-        }
-
-        var propValue = GetPropertyValue(entity, field);
-        if (propValue == null) return false;
-
-        return propValue.ToString().IndexOf(searchValue, StringComparison.OrdinalIgnoreCase) >= 0;
-    }
-
-    private static bool HandleStartsWithFunction(JObject entity, string condition)
-    {
-        // Extract parameters from STARTSWITH(field, value)
-        var functionContent = ExtractFunctionContent(condition, "STARTSWITH");
-        var parameters = SplitFunctionParameters(functionContent);
-
-        if (parameters.Length != 2) return false;
-
-        var field = parameters[0].Trim();
-        var searchValue = parameters[1].Trim().Trim('\'', '"');
-
-        // Handle the 'c.' prefix in field paths
-        if (field.StartsWith("c."))
-        {
-            field = field.Substring(2);
-        }
-
-        var propValue = GetPropertyValue(entity, field);
-        if (propValue == null) return false;
-
-        return propValue.ToString().StartsWith(searchValue, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ExtractFunctionContent(string condition, string functionName)
-    {
-        var startIndex = condition.IndexOf(functionName + "(", StringComparison.OrdinalIgnoreCase) + functionName.Length + 1;
-        var endIndex = condition.IndexOf(')', startIndex);
-        return condition.Substring(startIndex, endIndex - startIndex);
-    }
-
-    private static string[] SplitFunctionParameters(string parameters)
-    {
-        return parameters.Split(',');
-    }
-
-    private static object GetPropertyValue(JObject entity, string propertyPath)
-    {
-        if (string.IsNullOrEmpty(propertyPath))
-            return null;
-
-        // Handle 'c.' prefix
-        if (propertyPath.StartsWith("c."))
-        {
-            propertyPath = propertyPath.Substring(2);
-        }
-
-        // Handle nested properties with dot notation (e.g., "address.city")
-        var parts = propertyPath.Split('.');
-        JToken current = entity;
+        var parts = path.Split('.');
+        JToken current = item;
 
         foreach (var part in parts)
         {
-            if (current == null)
+            if (current is JObject obj)
+            {
+                current = obj[part];
+                if (current == null)
+                {
+                    return null;
+                }
+            }
+            else
+            {
                 return null;
-
-            // Check if the property exists
-            if (current.Type == JTokenType.Object && !((JObject)current).ContainsKey(part))
-                return null;
-
-            current = current[part];
+            }
         }
 
         return current;
+    }
+
+    private static void SetPropertyByPath(JObject item, string path, JToken value)
+    {
+        var parts = path.Split('.');
+        var current = item;
+
+        // Navigate to the last parent in the path
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            var part = parts[i];
+            if (current[part] == null || !(current[part] is JObject))
+            {
+                current[part] = new JObject();
+            }
+            current = (JObject)current[part];
+        }
+
+        // Set the value on the last part
+        current[parts[parts.Length - 1]] = value;
+    }
+
+    private static bool ApplyWhere(JObject item, Expression condition)
+    {
+        return EvaluateExpression(item, condition);
+    }
+
+    private static bool EvaluateExpression(JObject item, Expression expression)
+    {
+        if (expression is BinaryExpression binary)
+        {
+            var leftValue = EvaluateValue(item, binary.Left);
+            var rightValue = EvaluateValue(item, binary.Right);
+
+            switch (binary.Operator)
+            {
+                case BinaryOperator.Equal:
+                    return Equals(leftValue, rightValue);
+                case BinaryOperator.NotEqual:
+                    return !Equals(leftValue, rightValue);
+                case BinaryOperator.GreaterThan:
+                    return CompareValues(leftValue, rightValue) > 0;
+                case BinaryOperator.LessThan:
+                    return CompareValues(leftValue, rightValue) < 0;
+                case BinaryOperator.GreaterThanOrEqual:
+                    return CompareValues(leftValue, rightValue) >= 0;
+                case BinaryOperator.LessThanOrEqual:
+                    return CompareValues(leftValue, rightValue) <= 0;
+                case BinaryOperator.And:
+                    return EvaluateExpression(item, binary.Left) && EvaluateExpression(item, binary.Right);
+                case BinaryOperator.Or:
+                    return EvaluateExpression(item, binary.Left) || EvaluateExpression(item, binary.Right);
+                default:
+                    throw new NotImplementedException($"Operator {binary.Operator} not implemented");
+            }
+        }
+
+        if (expression is PropertyExpression prop)
+        {
+            // For boolean property expressions, simply check if the property exists and is true
+            var value = GetPropertyValue(item, prop.PropertyPath);
+            if (value is bool boolValue)
+            {
+                return boolValue;
+            }
+            return value != null;
+        }
+
+        if (expression is FunctionCallExpression func)
+        {
+            return EvaluateFunction(item, func);
+        }
+
+        throw new NotImplementedException($"Expression type {expression.GetType().Name} not implemented");
+    }
+
+    private static object EvaluateValue(JObject item, Expression expression)
+    {
+        if (expression is ConstantExpression constant)
+        {
+            return constant.Value;
+        }
+
+        if (expression is PropertyExpression prop)
+        {
+            return GetPropertyValue(item, prop.PropertyPath);
+        }
+
+        if (expression is FunctionCallExpression func)
+        {
+            return EvaluateFunction(item, func);
+        }
+
+        throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
+    }
+
+    private static bool EvaluateFunction(JObject item, FunctionCallExpression function)
+    {
+        if (string.Equals(function.Name, "CONTAINS", StringComparison.OrdinalIgnoreCase) && function.Arguments.Count == 2)
+        {
+            var propertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
+            var searchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+
+            if (propertyValue == null || searchValue == null)
+            {
+                return false;
+            }
+
+            return propertyValue.Contains(searchValue);
+        }
+
+        if (string.Equals(function.Name, "STARTSWITH", StringComparison.OrdinalIgnoreCase) && function.Arguments.Count == 2)
+        {
+            var propertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
+            var searchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+
+            if (propertyValue == null || searchValue == null)
+            {
+                return false;
+            }
+
+            return propertyValue.StartsWith(searchValue);
+        }
+
+        throw new NotImplementedException($"Function {function.Name} not implemented");
+    }
+
+    private static int CompareValues(object left, object right)
+    {
+        if (left == null && right == null)
+        {
+            return 0;
+        }
+
+        if (left == null)
+        {
+            return -1;
+        }
+
+        if (right == null)
+        {
+            return 1;
+        }
+
+        if (left is IComparable comparable)
+        {
+            try
+            {
+                return comparable.CompareTo(right);
+            }
+            catch
+            {
+                // Fall back to string comparison if direct comparison fails
+                return comparable.ToString().CompareTo(right.ToString());
+            }
+        }
+
+        // Default to string comparison
+        return left.ToString().CompareTo(right.ToString());
     }
 }

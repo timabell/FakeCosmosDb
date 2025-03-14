@@ -5,7 +5,12 @@ using Newtonsoft.Json.Linq;
 
 namespace TimAbell.MockableCosmos;
 
-public class CosmosDbIndexManager
+public interface ICosmosDbIndexManager
+{
+    void Index(JObject entity);
+}
+
+public class CosmosDbIndexManager : ICosmosDbIndexManager
 {
     private readonly Dictionary<string, Dictionary<object, HashSet<string>>> _indexes = new();
 

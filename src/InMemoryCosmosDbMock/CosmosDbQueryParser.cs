@@ -1,110 +1,117 @@
-// Query parsing logic
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
+using TimAbell.MockableCosmos.Parsing;
 
 namespace TimAbell.MockableCosmos;
 
-public class CosmosDbQueryParser
+/// <summary>
+/// Parses CosmosDB SQL queries.
+/// </summary>
+public class CosmosDbQueryParser : ICosmosDbQueryParser
 {
-    public static ParsedQuery Parse(string sql)
+    private readonly SpracheSqlQueryParser _parser = new SpracheSqlQueryParser();
+
+    /// <summary>
+    /// Parses a CosmosDB SQL query.
+    /// </summary>
+    public ParsedQuery Parse(string query)
     {
-        var selectClause = ExtractSelectClause(sql);
-        var whereClause = ExtractWhereClause(sql);
-        var orderBy = ExtractOrderBy(sql);
-        var limit = ExtractLimit(sql);
-
-        return new ParsedQuery(selectClause, whereClause, orderBy, limit);
-    }
-
-    private static string ExtractSelectClause(string sql)
-    {
-        // Default to SELECT * if not specified
-        if (!sql.ToUpperInvariant().Contains("SELECT"))
-            return "*";
-
-        var match = Regex.Match(sql, @"SELECT\s+(.*?)\s+FROM", RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups[1].Value.Trim() : "*";
-    }
-
-    private static string ExtractWhereClause(string sql)
-    {
-        if (!sql.ToUpperInvariant().Contains("WHERE"))
-            return null;
-
-        var fromWherePart = sql.Split(new[] { "WHERE" }, StringSplitOptions.None)[1];
-
-        // Check if there's an ORDER BY clause after the WHERE
-        if (fromWherePart.ToUpperInvariant().Contains("ORDER BY"))
-            return fromWherePart.Split(new[] { "ORDER BY" }, StringSplitOptions.None)[0].Trim();
-
-        // Check if there's a LIMIT clause after the WHERE
-        if (fromWherePart.ToUpperInvariant().Contains("OFFSET") || fromWherePart.ToUpperInvariant().Contains("LIMIT"))
-        {
-            var limitIndex = fromWherePart.ToUpperInvariant().IndexOf("OFFSET");
-            if (limitIndex < 0)
-                limitIndex = fromWherePart.ToUpperInvariant().IndexOf("LIMIT");
-
-            return fromWherePart.Substring(0, limitIndex).Trim();
-        }
-
-        return fromWherePart.Trim();
-    }
-
-    private static string ExtractOrderBy(string sql)
-    {
-        if (!sql.ToUpperInvariant().Contains("ORDER BY"))
-            return null;
-
-        var orderByPart = sql.Split(new[] { "ORDER BY" }, StringSplitOptions.None)[1];
-
-        // Check if there's a LIMIT or OFFSET clause after the ORDER BY
-        if (orderByPart.ToUpperInvariant().Contains("OFFSET") || orderByPart.ToUpperInvariant().Contains("LIMIT"))
-        {
-            var limitIndex = orderByPart.ToUpperInvariant().IndexOf("OFFSET");
-            if (limitIndex < 0)
-                limitIndex = orderByPart.ToUpperInvariant().IndexOf("LIMIT");
-
-            return orderByPart.Substring(0, limitIndex).Trim();
-        }
-
-        return orderByPart.Trim();
-    }
-
-    private static int? ExtractLimit(string sql)
-    {
-        var limitMatch = Regex.Match(sql, @"LIMIT\s+(\d+)", RegexOptions.IgnoreCase);
-        if (limitMatch.Success && int.TryParse(limitMatch.Groups[1].Value, out var limit))
-            return limit;
-
-        return null;
+        return _parser.Parse(query);
     }
 }
 
+/// <summary>
+/// Interface for CosmosDB query parsers.
+/// </summary>
+public interface ICosmosDbQueryParser
+{
+    /// <summary>
+    /// Parses a CosmosDB SQL query.
+    /// </summary>
+    ParsedQuery Parse(string query);
+}
+
+/// <summary>
+/// Represents a parsed CosmosDB SQL query.
+/// </summary>
 public class ParsedQuery
 {
-    public string SelectClause { get; }
-    public string WhereClause { get; }
-    public string OrderBy { get; }
-    public int? Limit { get; }
+    /// <summary>
+    /// The parsed SQL query using the Sprache SQL parser.
+    /// </summary>
+    public CosmosDbSqlQuery SprachedSqlAst { get; set; }
 
-    public ParsedQuery(string selectClause, string whereClause, string orderBy, int? limit = null)
-    {
-        SelectClause = selectClause;
-        WhereClause = whereClause;
-        OrderBy = orderBy;
-        Limit = limit;
-    }
+    /// <summary>
+    /// List of property paths to select from the results.
+    /// </summary>
+    public List<string> PropertyPaths { get; set; } = new List<string>();
 
-    public bool IsSelectAll => SelectClause == "*";
+    /// <summary>
+    /// The name of the container or collection in the FROM clause.
+    /// </summary>
+    public string FromName { get; set; }
 
-    public IEnumerable<string> GetSelectedProperties()
-    {
-        if (IsSelectAll)
-            return null;
+    /// <summary>
+    /// The alias used for the FROM source, if any.
+    /// </summary>
+    public string FromAlias { get; set; }
 
-        return SelectClause.Split(',').Select(p => p.Trim());
-    }
+    /// <summary>
+    /// List of conditions in the WHERE clause.
+    /// </summary>
+    public List<WhereCondition> WhereConditions { get; set; } = new List<WhereCondition>();
+
+    /// <summary>
+    /// List of ORDER BY clauses.
+    /// </summary>
+    public List<OrderInfo> OrderBy { get; set; }
+
+    /// <summary>
+    /// LIMIT value, if any.
+    /// </summary>
+    public int Limit { get; set; }
+
+    /// <summary>
+    /// Whether this is a SELECT * query.
+    /// </summary>
+    public bool IsSelectAll => PropertyPaths.Count == 1 && PropertyPaths[0] == "*";
+}
+
+/// <summary>
+/// Represents a condition in a WHERE clause.
+/// </summary>
+public class WhereCondition
+{
+    /// <summary>
+    /// The property path to test.
+    /// </summary>
+    public string PropertyPath { get; set; }
+
+    /// <summary>
+    /// The operator to apply.
+    /// </summary>
+    public string Operator { get; set; }
+
+    /// <summary>
+    /// The value to compare with.
+    /// </summary>
+    public JToken Value { get; set; }
+}
+
+/// <summary>
+/// Represents an ORDER BY clause.
+/// </summary>
+public class OrderInfo
+{
+    /// <summary>
+    /// The property path to order by.
+    /// </summary>
+    public string PropertyPath { get; set; }
+
+    /// <summary>
+    /// The direction to order in (ASC or DESC).
+    /// </summary>
+    public string Direction { get; set; } = "ASC";
 }
