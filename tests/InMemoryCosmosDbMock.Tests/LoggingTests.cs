@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
+using InMemoryCosmosDbMock.Tests.Utilities;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TimAbell.MockableCosmos;
@@ -18,38 +19,6 @@ namespace InMemoryCosmosDbMock.Tests
 		public LoggingTests(ITestOutputHelper output)
 		{
 			_output = output;
-		}
-
-		/// <summary>
-		/// A test logger that outputs to xUnit's ITestOutputHelper
-		/// </summary>
-		private class TestLogger : ILogger
-		{
-			private readonly ITestOutputHelper _output;
-
-			public TestLogger(ITestOutputHelper output)
-			{
-				_output = output;
-			}
-
-			public IDisposable BeginScope<TState>(TState state)
-			{
-				return null;
-			}
-
-			public bool IsEnabled(LogLevel logLevel)
-			{
-				return true;
-			}
-
-			public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
-			{
-				_output.WriteLine($"{logLevel}: {formatter(state, exception)}");
-				if (exception != null)
-				{
-					_output.WriteLine($"Exception: {exception}");
-				}
-			}
 		}
 
 		[Fact]

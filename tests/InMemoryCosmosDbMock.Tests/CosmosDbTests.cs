@@ -1,17 +1,23 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using InMemoryCosmosDbMock.Tests.Utilities;
+using InMemoryCosmosDbMock.Tests.Utilities;
+using Microsoft.Extensions.Logging;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace TimAbell.MockableCosmos.Tests;
 
 public class CosmosDbTests
 {
-	public static IEnumerable<object[]> TestConfigurations()
+	private readonly ITestOutputHelper _output;
+	private static ILogger _logger;
+
+	public CosmosDbTests(ITestOutputHelper output)
 	{
-		yield return new object[] { new CosmosInMemoryCosmosDb() };
-		// Skip the real adapter in normal test runs
-		// yield return new object[] { new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
+		_output = output;
+		_logger = new TestLogger(output);
 	}
 
 	[Theory]
@@ -28,5 +34,12 @@ public class CosmosDbTests
 
 		Assert.Single(results);
 		Assert.Equal("Alice", results.First()["Name"]);
+	}
+
+	public static IEnumerable<object[]> TestConfigurations()
+	{
+		yield return new object[] { new CosmosInMemoryCosmosDb(_logger) };
+		// Skip the real adapter in normal test runs
+		// yield return new object[] { new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
 	}
 }
