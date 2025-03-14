@@ -623,6 +623,11 @@ public class CosmosDbQueryExecutor
 
 	private bool EvaluateExpression(JObject item, Expression expression)
 	{
+		if (_logger != null)
+		{
+			_logger.LogDebug("Evaluating expression of type: {type}", expression.GetType().Name);
+		}
+
 		if (expression is BinaryExpression binary)
 		{
 			var leftValue = EvaluateValue(item, binary.Left);
@@ -653,8 +658,73 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("JValue string comparison: '{left}' = '{right}'", leftStr, rightStr);
 							}
-
 							return string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
+						}
+					}
+					// Handle numeric comparisons
+					else if (leftValue is JValue leftNumJValue &&
+							 (leftNumJValue.Type == JTokenType.Integer || leftNumJValue.Type == JTokenType.Float))
+					{
+						// Try to get numeric values for comparison
+						if (leftNumJValue.Type == JTokenType.Integer)
+						{
+							var leftInt = leftNumJValue.Value<int>();
+							if (rightValue is int rightInt)
+							{
+								if (_logger != null)
+								{
+									_logger.LogDebug("JValue integer comparison: {left} = {right}", leftInt, rightInt);
+								}
+								return leftInt == rightInt;
+							}
+							else if (rightValue is double rightDouble)
+							{
+								return leftInt == rightDouble;
+							}
+							else if (rightValue is JValue rightJValue1 && rightJValue1.Type == JTokenType.Integer)
+							{
+								var rightInt1 = rightJValue1.Value<int>();
+								return leftInt == rightInt1;
+							}
+							else if (rightValue is JValue rightJValue2 && rightJValue2.Type == JTokenType.Float)
+							{
+								var rightDouble1 = rightJValue2.Value<double>();
+								return leftInt == rightDouble1;
+							}
+							else if (int.TryParse(rightValue?.ToString(), out int parsedInt))
+							{
+								return leftInt == parsedInt;
+							}
+						}
+						else if (leftNumJValue.Type == JTokenType.Float)
+						{
+							var leftDouble = leftNumJValue.Value<double>();
+							if (rightValue is double rightDouble2)
+							{
+								if (_logger != null)
+								{
+									_logger.LogDebug("JValue float comparison: {left} = {right}", leftDouble, rightDouble2);
+								}
+								return leftDouble == rightDouble2;
+							}
+							else if (rightValue is int rightInt2)
+							{
+								return leftDouble == rightInt2;
+							}
+							else if (rightValue is JValue rightJValue3 && rightJValue3.Type == JTokenType.Float)
+							{
+								var rightDouble3 = rightJValue3.Value<double>();
+								return leftDouble == rightDouble3;
+							}
+							else if (rightValue is JValue rightJValue4 && rightJValue4.Type == JTokenType.Integer)
+							{
+								var rightInt3 = rightJValue4.Value<int>();
+								return leftDouble == rightInt3;
+							}
+							else if (double.TryParse(rightValue?.ToString(), out double parsedDouble))
+							{
+								return leftDouble == parsedDouble;
+							}
 						}
 					}
 
