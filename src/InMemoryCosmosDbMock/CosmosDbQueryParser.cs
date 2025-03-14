@@ -39,6 +39,11 @@ public interface ICosmosDbQueryParser
 public class ParsedQuery
 {
     /// <summary>
+    /// The parsed SQL query using the Sprache SQL parser.
+    /// </summary>
+    public CosmosDbSqlQuery SprachedSqlAst { get; set; }
+
+    /// <summary>
     /// List of property paths to select from the results.
     /// </summary>
     public List<string> PropertyPaths { get; set; } = new List<string>();

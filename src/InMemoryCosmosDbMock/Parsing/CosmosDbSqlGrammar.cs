@@ -14,24 +14,25 @@ public static class CosmosDbSqlGrammar
 
     // Whitespace handling
     private static readonly Parser<string> Spaces = Parse.WhiteSpace.Many().Text();
-    
+
     private static Parser<T> Token<T>(this Parser<T> parser)
     {
-        return parser.Then(item => 
-            Spaces.Then(_ => Parse.Return(item)))
-            .Preturn(Spaces);
+        return Spaces.Then(_ => parser).Then(item => Spaces.Return(item));
     }
 
     // SQL keywords (case insensitive)
     private static Parser<string> Keyword(string word)
     {
-        return Parse.IgnoreCase(word).Token();
+        return Parse.IgnoreCase(word).Text().Token();
     }
 
     // Identifiers for table and column names
     public static readonly Parser<string> Identifier =
-        Parse.Letter.Once().Concat(Parse.LetterOrDigit.Or(Parse.Char('_')).Many())
-            .Select(chars => new string(chars.ToArray()));
+        Parse.Letter.AtLeastOnce().Text().Then(first =>
+            Parse.LetterOrDigit.Or(Parse.Char('_')).Many().Text().Select(rest =>
+                first + rest
+            )
+        );
 
     // Property path (e.g., "c.Address.City")
     public static readonly Parser<string> PropertyPath =
@@ -39,18 +40,19 @@ public static class CosmosDbSqlGrammar
 
     // String literals
     public static readonly Parser<string> StringLiteral =
-        Parse.Char('\'').Then(_ => 
-            Parse.CharExcept('\'').Many().Text().Then(content => 
+        Parse.Char('\'').Then(_ =>
+            Parse.CharExcept('\'').Many().Text().Then(content =>
                 Parse.Char('\'').Return(content)));
 
     // Numeric literals
     public static readonly Parser<double> NumberLiteral =
-        Parse.Char('-').Optional().Then(sign => 
-            Parse.Digit.AtLeastOnce().Text().Then(whole => 
-                Parse.Char('.').Optional().Then(dot => 
-                    (dot.IsDefined 
-                        ? Parse.Digit.Many().Text() 
-                        : Parse.Return("")).Select(fraction => {
+        Parse.Char('-').Optional().Then(sign =>
+            Parse.Digit.AtLeastOnce().Text().Then(whole =>
+                Parse.Char('.').Optional().Then(dot =>
+                    (dot.IsDefined
+                        ? Parse.Digit.Many().Text()
+                        : Parse.Return("")).Select(fraction =>
+                        {
                             string number = (sign.IsDefined ? "-" : "") + whole + (dot.IsDefined ? "." + fraction : "");
                             return double.Parse(number);
                         }))));
@@ -123,8 +125,13 @@ public static class CosmosDbSqlGrammar
     // Binary expression with operator precedence
     private static Parser<Expression> Binary(Parser<Expression> operand, Parser<BinaryOperator> op)
     {
-        return operand.Then(first => 
-            op.Then(operator1 => operand).Many().Select(rest => {
+        return operand.Then(first =>
+            op.Then(operator1 =>
+                operand.Select(operand1 =>
+                    new Tuple<BinaryOperator, Expression>(operator1, operand1)
+                )
+            ).Many().Select(rest =>
+            {
                 Expression result = first;
                 foreach (var pair in rest)
                 {
@@ -136,9 +143,9 @@ public static class CosmosDbSqlGrammar
 
     // Main expression parser with operator precedence
     private static readonly Parser<Expression> ComparisonExpr =
-        AtomExpr.Then(left => 
-            ComparisonOperator.Then(op => 
-                AtomExpr.Select(right => 
+        AtomExpr.Then(left =>
+            ComparisonOperator.Then(op =>
+                AtomExpr.Select(right =>
                     (Expression)new BinaryExpression(left, op, right))));
 
     private static readonly Parser<Expression> SimpleExpr =
@@ -162,7 +169,7 @@ public static class CosmosDbSqlGrammar
 
     // SELECT clause parsing
     private static readonly Parser<SelectClause> SelectClauseParser =
-        Keyword("SELECT").Then(_ => 
+        Keyword("SELECT").Then(_ =>
             Parse.Char('*').Token().Select(_ => (IReadOnlyList<SelectItem>)new List<SelectItem> { new SelectAllItem() })
             .Or(PropertyPath.Token().DelimitedBy(Parse.Char(',').Token())
                 .Select(paths => (IReadOnlyList<SelectItem>)paths.Select(p => (SelectItem)new PropertySelectItem(p)).ToList()))
@@ -170,48 +177,48 @@ public static class CosmosDbSqlGrammar
 
     // FROM clause parsing
     private static readonly Parser<FromClause> FromClauseParser =
-        Keyword("FROM").Then(_ => 
-            Identifier.Token().Then(source => 
-                Keyword("AS").Optional().Then(_ => 
-                    Identifier.Token().Optional().Select(alias => 
+        Keyword("FROM").Then(_ =>
+            Identifier.Token().Then(source =>
+                Keyword("AS").Optional().Then(_ =>
+                    Identifier.Token().Optional().Select(alias =>
                         new FromClause(source, alias.GetOrDefault())))));
 
     // WHERE clause parsing
     private static readonly Parser<WhereClause> WhereClauseParser =
-        Keyword("WHERE").Then(_ => 
-            ExpressionParser.Select(condition => 
+        Keyword("WHERE").Then(_ =>
+            ExpressionParser.Select(condition =>
                 new WhereClause(condition)));
 
     // ORDER BY clause parsing
     private static readonly Parser<OrderByItem> OrderByItemParser =
-        PropertyPath.Token().Then(path => 
+        PropertyPath.Token().Then(path =>
             Keyword("DESC").Return(true).Or(Keyword("ASC").Return(false)).Optional()
                 .Select(direction => new OrderByItem(path, direction.GetOrDefault(false))));
 
     private static readonly Parser<OrderByClause> OrderByClauseParser =
-        Keyword("ORDER").Then(_ => 
-            Keyword("BY").Then(_ => 
+        Keyword("ORDER").Then(_ =>
+            Keyword("BY").Then(_ =>
                 OrderByItemParser.DelimitedBy(Parse.Char(',').Token())
                     .Select(items => new OrderByClause(items.ToList()))));
 
     // LIMIT clause parsing
     private static readonly Parser<LimitClause> LimitClauseParser =
-        Keyword("LIMIT").Then(_ => 
-            Parse.Number.Select(value => 
+        Keyword("LIMIT").Then(_ =>
+            Parse.Number.Select(value =>
                 new LimitClause(int.Parse(value))));
 
     // Complete SQL query parsing
     private static readonly Parser<CosmosDbSqlQuery> QueryParser =
-        SelectClauseParser.Then(select => 
-            FromClauseParser.Then(from => 
-                WhereClauseParser.Optional().Then(where => 
-                    OrderByClauseParser.Optional().Then(orderBy => 
-                        LimitClauseParser.Optional().Select(limit => 
+        SelectClauseParser.Then(select =>
+            FromClauseParser.Then(from =>
+                WhereClauseParser.Optional().Then(where =>
+                    OrderByClauseParser.Optional().Then(orderBy =>
+                        LimitClauseParser.Optional().Select(limit =>
                             new CosmosDbSqlQuery(
-                                select, 
-                                from, 
-                                where.GetOrDefault(), 
-                                orderBy.GetOrDefault(), 
+                                select,
+                                from,
+                                where.GetOrDefault(),
+                                orderBy.GetOrDefault(),
                                 limit.GetOrDefault()
                             ))))));
 

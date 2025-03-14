@@ -211,6 +211,7 @@ public class ConstantExpression : Expression
 public class FunctionCallExpression : Expression
 {
     public string FunctionName { get; }
+    public string Name => FunctionName;
     public IReadOnlyList<Expression> Arguments { get; }
 
     public FunctionCallExpression(string functionName, IReadOnlyList<Expression> arguments)

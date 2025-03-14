@@ -7,7 +7,12 @@ using Newtonsoft.Json.Linq;
 
 namespace TimAbell.MockableCosmos;
 
-public class CosmosDbPaginationManager
+public interface ICosmosDbPaginationManager
+{
+    (IEnumerable<JObject> Results, string ContinuationToken) GetPage(IEnumerable<JObject> results, int maxItemCount, string continuationToken = null);
+}
+
+public class CosmosDbPaginationManager : ICosmosDbPaginationManager
 {
     private readonly Dictionary<string, PaginationState> _paginationStates = new Dictionary<string, PaginationState>();
 

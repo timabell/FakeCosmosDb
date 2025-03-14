@@ -27,6 +27,7 @@ public class SpracheSqlQueryParser : ICosmosDbQueryParser
     {
         var result = new ParsedQuery
         {
+            SprachedSqlAst = query,
             PropertyPaths = ExtractPropertyPaths(query.Select),
             FromName = query.From.Source,
             FromAlias = query.From.Alias,
