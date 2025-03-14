@@ -7,51 +7,51 @@ namespace TimAbell.MockableCosmos.Parsing;
 /// </summary>
 public class CosmosDbSqlQuery
 {
-    public SelectClause Select { get; }
-    public FromClause From { get; }
-    public WhereClause Where { get; }
-    public OrderByClause OrderBy { get; }
-    public LimitClause Limit { get; }
+	public SelectClause Select { get; }
+	public FromClause From { get; }
+	public WhereClause Where { get; }
+	public OrderByClause OrderBy { get; }
+	public LimitClause Limit { get; }
 
-    public CosmosDbSqlQuery(
-        SelectClause select,
-        FromClause from,
-        WhereClause where = null,
-        OrderByClause orderBy = null,
-        LimitClause limit = null)
-    {
-        Select = select;
-        From = from;
-        Where = where;
-        OrderBy = orderBy;
-        Limit = limit;
-    }
+	public CosmosDbSqlQuery(
+		SelectClause select,
+		FromClause from,
+		WhereClause where = null,
+		OrderByClause orderBy = null,
+		LimitClause limit = null)
+	{
+		Select = select;
+		From = from;
+		Where = where;
+		OrderBy = orderBy;
+		Limit = limit;
+	}
 
-    public override string ToString()
-    {
-        var parts = new List<string>
-        {
-            Select.ToString(),
-            From.ToString()
-        };
+	public override string ToString()
+	{
+		var parts = new List<string>
+		{
+			Select.ToString(),
+			From.ToString()
+		};
 
-        if (Where != null)
-        {
-            parts.Add(Where.ToString());
-        }
+		if (Where != null)
+		{
+			parts.Add(Where.ToString());
+		}
 
-        if (OrderBy != null)
-        {
-            parts.Add(OrderBy.ToString());
-        }
+		if (OrderBy != null)
+		{
+			parts.Add(OrderBy.ToString());
+		}
 
-        if (Limit != null)
-        {
-            parts.Add(Limit.ToString());
-        }
+		if (Limit != null)
+		{
+			parts.Add(Limit.ToString());
+		}
 
-        return string.Join(" ", parts);
-    }
+		return string.Join(" ", parts);
+	}
 }
 
 /// <summary>
@@ -59,32 +59,32 @@ public class CosmosDbSqlQuery
 /// </summary>
 public class SelectClause
 {
-    public IReadOnlyList<SelectItem> Items { get; }
-    public bool IsSelectAll => Items.Count == 1 && Items[0] is SelectAllItem;
+	public IReadOnlyList<SelectItem> Items { get; }
+	public bool IsSelectAll => Items.Count == 1 && Items[0] is SelectAllItem;
 
-    public SelectClause(IReadOnlyList<SelectItem> items)
-    {
-        Items = items;
-    }
+	public SelectClause(IReadOnlyList<SelectItem> items)
+	{
+		Items = items;
+	}
 
-    public override string ToString()
-    {
-        if (IsSelectAll)
-        {
-            return "SELECT *";
-        }
+	public override string ToString()
+	{
+		if (IsSelectAll)
+		{
+			return "SELECT *";
+		}
 
-        var propertyPaths = new List<string>();
-        foreach (var item in Items)
-        {
-            if (item is PropertySelectItem propertyItem)
-            {
-                propertyPaths.Add(propertyItem.PropertyPath);
-            }
-        }
+		var propertyPaths = new List<string>();
+		foreach (var item in Items)
+		{
+			if (item is PropertySelectItem propertyItem)
+			{
+				propertyPaths.Add(propertyItem.PropertyPath);
+			}
+		}
 
-        return $"SELECT {string.Join(", ", propertyPaths)}";
-    }
+		return $"SELECT {string.Join(", ", propertyPaths)}";
+	}
 }
 
 /// <summary>
@@ -99,8 +99,8 @@ public abstract class SelectItem
 /// </summary>
 public class SelectAllItem : SelectItem
 {
-    public static readonly SelectAllItem Instance = new SelectAllItem();
-    public SelectAllItem() { }
+	public static readonly SelectAllItem Instance = new SelectAllItem();
+	public SelectAllItem() { }
 }
 
 /// <summary>
@@ -108,12 +108,12 @@ public class SelectAllItem : SelectItem
 /// </summary>
 public class PropertySelectItem : SelectItem
 {
-    public string PropertyPath { get; }
+	public string PropertyPath { get; }
 
-    public PropertySelectItem(string propertyPath)
-    {
-        PropertyPath = propertyPath;
-    }
+	public PropertySelectItem(string propertyPath)
+	{
+		PropertyPath = propertyPath;
+	}
 }
 
 /// <summary>
@@ -121,19 +121,19 @@ public class PropertySelectItem : SelectItem
 /// </summary>
 public class FromClause
 {
-    public string Source { get; }
-    public string Alias { get; }
+	public string Source { get; }
+	public string Alias { get; }
 
-    public FromClause(string source, string alias)
-    {
-        Source = source;
-        Alias = alias;
-    }
+	public FromClause(string source, string alias)
+	{
+		Source = source;
+		Alias = alias;
+	}
 
-    public override string ToString()
-    {
-        return Alias != null ? $"FROM {Source} AS {Alias}" : $"FROM {Source}";
-    }
+	public override string ToString()
+	{
+		return Alias != null ? $"FROM {Source} AS {Alias}" : $"FROM {Source}";
+	}
 }
 
 /// <summary>
@@ -141,14 +141,14 @@ public class FromClause
 /// </summary>
 public class WhereClause
 {
-    public Expression Condition { get; }
+	public Expression Condition { get; }
 
-    public WhereClause(Expression condition)
-    {
-        Condition = condition;
-    }
+	public WhereClause(Expression condition)
+	{
+		Condition = condition;
+	}
 
-    public override string ToString() => $"WHERE {Condition}";
+	public override string ToString() => $"WHERE {Condition}";
 }
 
 /// <summary>
@@ -156,14 +156,14 @@ public class WhereClause
 /// </summary>
 public class OrderByClause
 {
-    public IReadOnlyList<OrderByItem> Items { get; }
+	public IReadOnlyList<OrderByItem> Items { get; }
 
-    public OrderByClause(IReadOnlyList<OrderByItem> items)
-    {
-        Items = items;
-    }
+	public OrderByClause(IReadOnlyList<OrderByItem> items)
+	{
+		Items = items;
+	}
 
-    public override string ToString() => $"ORDER BY {string.Join(", ", Items)}";
+	public override string ToString() => $"ORDER BY {string.Join(", ", Items)}";
 }
 
 /// <summary>
@@ -171,16 +171,16 @@ public class OrderByClause
 /// </summary>
 public class OrderByItem
 {
-    public string PropertyPath { get; }
-    public bool Descending { get; }
+	public string PropertyPath { get; }
+	public bool Descending { get; }
 
-    public OrderByItem(string propertyPath, bool descending = false)
-    {
-        PropertyPath = propertyPath;
-        Descending = descending;
-    }
+	public OrderByItem(string propertyPath, bool descending = false)
+	{
+		PropertyPath = propertyPath;
+		Descending = descending;
+	}
 
-    public override string ToString() => Descending ? $"{PropertyPath} DESC" : $"{PropertyPath} ASC";
+	public override string ToString() => Descending ? $"{PropertyPath} DESC" : $"{PropertyPath} ASC";
 }
 
 /// <summary>
@@ -188,14 +188,14 @@ public class OrderByItem
 /// </summary>
 public class LimitClause
 {
-    public int Value { get; }
+	public int Value { get; }
 
-    public LimitClause(int value)
-    {
-        Value = value;
-    }
+	public LimitClause(int value)
+	{
+		Value = value;
+	}
 
-    public override string ToString() => $"LIMIT {Value}";
+	public override string ToString() => $"LIMIT {Value}";
 }
 
 /// <summary>
@@ -203,7 +203,7 @@ public class LimitClause
 /// </summary>
 public abstract class Expression
 {
-    public abstract override string ToString();
+	public abstract override string ToString();
 }
 
 /// <summary>
@@ -211,18 +211,18 @@ public abstract class Expression
 /// </summary>
 public class BinaryExpression : Expression
 {
-    public Expression Left { get; }
-    public BinaryOperator Operator { get; }
-    public Expression Right { get; }
+	public Expression Left { get; }
+	public BinaryOperator Operator { get; }
+	public Expression Right { get; }
 
-    public BinaryExpression(Expression left, BinaryOperator op, Expression right)
-    {
-        Left = left;
-        Operator = op;
-        Right = right;
-    }
+	public BinaryExpression(Expression left, BinaryOperator op, Expression right)
+	{
+		Left = left;
+		Operator = op;
+		Right = right;
+	}
 
-    public override string ToString() => $"({Left} {Operator} {Right})";
+	public override string ToString() => $"({Left} {Operator} {Right})";
 }
 
 /// <summary>
@@ -230,14 +230,14 @@ public class BinaryExpression : Expression
 /// </summary>
 public enum BinaryOperator
 {
-    Equal,
-    NotEqual,
-    GreaterThan,
-    LessThan,
-    GreaterThanOrEqual,
-    LessThanOrEqual,
-    And,
-    Or
+	Equal,
+	NotEqual,
+	GreaterThan,
+	LessThan,
+	GreaterThanOrEqual,
+	LessThanOrEqual,
+	And,
+	Or
 }
 
 /// <summary>
@@ -245,14 +245,14 @@ public enum BinaryOperator
 /// </summary>
 public class PropertyExpression : Expression
 {
-    public string PropertyPath { get; }
+	public string PropertyPath { get; }
 
-    public PropertyExpression(string propertyPath)
-    {
-        PropertyPath = propertyPath;
-    }
+	public PropertyExpression(string propertyPath)
+	{
+		PropertyPath = propertyPath;
+	}
 
-    public override string ToString() => PropertyPath;
+	public override string ToString() => PropertyPath;
 }
 
 /// <summary>
@@ -260,14 +260,14 @@ public class PropertyExpression : Expression
 /// </summary>
 public class ConstantExpression : Expression
 {
-    public object Value { get; }
+	public object Value { get; }
 
-    public ConstantExpression(object value)
-    {
-        Value = value;
-    }
+	public ConstantExpression(object value)
+	{
+		Value = value;
+	}
 
-    public override string ToString() => Value?.ToString() ?? "null";
+	public override string ToString() => Value?.ToString() ?? "null";
 }
 
 /// <summary>
@@ -275,15 +275,15 @@ public class ConstantExpression : Expression
 /// </summary>
 public class FunctionCallExpression : Expression
 {
-    public string FunctionName { get; }
-    public string Name => FunctionName;
-    public IReadOnlyList<Expression> Arguments { get; }
+	public string FunctionName { get; }
+	public string Name => FunctionName;
+	public IReadOnlyList<Expression> Arguments { get; }
 
-    public FunctionCallExpression(string functionName, IReadOnlyList<Expression> arguments)
-    {
-        FunctionName = functionName;
-        Arguments = arguments;
-    }
+	public FunctionCallExpression(string functionName, IReadOnlyList<Expression> arguments)
+	{
+		FunctionName = functionName;
+		Arguments = arguments;
+	}
 
-    public override string ToString() => $"{FunctionName}({string.Join(", ", Arguments)})";
+	public override string ToString() => $"{FunctionName}({string.Join(", ", Arguments)})";
 }
