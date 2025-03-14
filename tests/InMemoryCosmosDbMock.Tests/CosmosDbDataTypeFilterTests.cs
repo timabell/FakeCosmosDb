@@ -166,14 +166,117 @@ namespace TimAbell.MockableCosmos.Tests
 			await SeedTestDataWithNullValues(containerName);
 
 			// Act & Assert - IS NULL
-			var resultsIsNull = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE c.OptionalField = null");
+			var resultsIsNull = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE IS_NULL(c.OptionalField)");
 			resultsIsNull.Should().HaveCount(2, "because two documents have OptionalField = null");
 			resultsIsNull.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Bob", "Alice" });
 
 			// Act & Assert - IS NOT NULL
-			var resultsIsNotNull = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE c.OptionalField != null");
+			var resultsIsNotNull = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE NOT IS_NULL(c.OptionalField)");
 			resultsIsNotNull.Should().HaveCount(2, "because two documents have OptionalField != null");
 			resultsIsNotNull.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "John", "Jane" });
+		}
+
+		[Fact]
+		public async Task Query_WithIsDefinedFunction_ReturnsCorrectResults()
+		{
+			// Arrange - Use a specific container for this test
+			string containerName = $"{_containerName}_DefinedFields";
+			await _db.AddContainerAsync(containerName);
+			await SeedTestDataWithDefinedAndUndefinedFields(containerName);
+
+			// Act & Assert - IS_DEFINED for field that exists in all documents (some null, some with values)
+			var resultsIsDefined = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE IS_DEFINED(c.OptionalField)");
+			resultsIsDefined.Should().HaveCount(4, "because all four documents have OptionalField defined (even if null)");
+
+			// Act & Assert - IS_DEFINED for field that only exists in some documents
+			var resultsIsDefinedPartial = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE IS_DEFINED(c.ConditionalField)");
+			resultsIsDefinedPartial.Should().HaveCount(2, "because only two documents have ConditionalField defined");
+			resultsIsDefinedPartial.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "John", "Jane" });
+
+			// Act & Assert - NOT IS_DEFINED for field that only exists in some documents
+			var resultsNotDefined = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE NOT IS_DEFINED(c.ConditionalField)");
+			resultsNotDefined.Should().HaveCount(2, "because two documents don't have ConditionalField defined");
+			resultsNotDefined.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Bob", "Alice" });
+		}
+
+		[Fact]
+		public async Task Query_WithNotOperator_ReturnsCorrectResults()
+		{
+			// Arrange - Use a specific container for this test
+			string containerName = $"{_containerName}_NotOperator";
+			await _db.AddContainerAsync(containerName);
+			await SeedTestDataForLogicalOperators(containerName);
+
+			// Act & Assert - NOT with boolean property
+			var resultsNotPremium = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE NOT c.IsPremium");
+			resultsNotPremium.Should().HaveCount(2, "because two documents have IsPremium = false");
+			resultsNotPremium.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Bob", "Alice" });
+
+			// Act & Assert - NOT with comparison
+			var resultsNotEngineering = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE NOT (c.Department = 'Engineering')");
+			resultsNotEngineering.Should().HaveCount(2, "because two documents have Department != Engineering");
+			resultsNotEngineering.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Alice" });
+
+			// Act & Assert - NOT with function
+			var resultsNotArray = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE NOT ARRAY_CONTAINS(c.Tags, 'senior')");
+			resultsNotArray.Should().HaveCount(1, "because one document doesn't have 'senior' in Tags");
+			resultsNotArray.First()["Name"].Value<string>().Should().Be("Jane");
+		}
+
+		[Fact]
+		public async Task Query_WithOrOperator_ReturnsCorrectResults()
+		{
+			// Arrange - Use a specific container for this test
+			string containerName = $"{_containerName}_OrOperator";
+			await _db.AddContainerAsync(containerName);
+			await SeedTestDataForLogicalOperators(containerName);
+
+			// Act & Assert - Simple OR between two conditions
+			var resultsSalesOrMarketing = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE c.Department = 'Sales' OR c.Department = 'Marketing'");
+			resultsSalesOrMarketing.Should().HaveCount(2, "because two documents are in Sales or Marketing");
+			resultsSalesOrMarketing.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Alice" });
+
+			// Act & Assert - OR with numeric comparison
+			var resultsYoungOrOld = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE c.Age < 30 OR c.Age >= 40");
+			resultsYoungOrOld.Should().HaveCount(3, "because three documents have Age < 30 or Age >= 40");
+			resultsYoungOrOld.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Bob", "Alice" });
+
+			// Act & Assert - OR with multiple criteria types
+			var resultsPremiumOrOld = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE c.IsPremium OR c.Age >= 35");
+			resultsPremiumOrOld.Should().HaveCount(4, "because all documents match one of these criteria");
+		}
+
+		[Fact]
+		public async Task Query_WithComplexLogicalExpressions_ReturnsCorrectResults()
+		{
+			// Arrange - Use a specific container for this test
+			string containerName = $"{_containerName}_ComplexLogical";
+			await _db.AddContainerAsync(containerName);
+			await SeedTestDataForLogicalOperators(containerName);
+
+			// Act & Assert - AND with OR
+			var resultsEngineeringAndSeniorOrPremium = await _db.QueryAsync(containerName, 
+				"SELECT * FROM c WHERE c.Department = 'Engineering' AND (ARRAY_CONTAINS(c.Tags, 'senior') OR c.IsPremium)");
+			resultsEngineeringAndSeniorOrPremium.Should().HaveCount(2, "because two Engineering documents are either senior or premium");
+			resultsEngineeringAndSeniorOrPremium.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "John", "Bob" });
+
+			// Act & Assert - NOT with AND
+			var resultsNotPremiumAndEngineering = await _db.QueryAsync(containerName, 
+				"SELECT * FROM c WHERE NOT c.IsPremium AND c.Department = 'Engineering'");
+			resultsNotPremiumAndEngineering.Should().HaveCount(1, "because one document is Engineering but not Premium");
+			resultsNotPremiumAndEngineering.First()["Name"].Value<string>().Should().Be("Bob");
+
+			// Act & Assert - Complex expression with multiple ANDs and ORs
+			var resultsComplex = await _db.QueryAsync(containerName, 
+				"SELECT * FROM c WHERE (c.Age > 30 AND c.Department = 'Engineering') OR (c.Age < 30 AND c.IsPremium)");
+			resultsComplex.Should().HaveCount(2, "because two documents match this complex condition");
+			resultsComplex.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Bob" });
+
+			// Act & Assert - Complex with NOT and parentheses
+			var resultsWithNotAndParentheses = await _db.QueryAsync(containerName, 
+				"SELECT * FROM c WHERE NOT (c.Department = 'Engineering' OR c.Age <= 30)");
+			resultsWithNotAndParentheses.Should().HaveCount(1, "because only one document is neither Engineering nor Age <= 30");
+			resultsWithNotAndParentheses.First()["Name"].Value<string>().Should().Be("Alice");
 		}
 
 		#region Test Data Creation
@@ -436,6 +539,85 @@ namespace TimAbell.MockableCosmos.Tests
 				id = "4",
 				Name = "Alice",
 				OptionalField = (string)null
+			});
+		}
+
+		private async Task SeedTestDataWithDefinedAndUndefinedFields(string containerName)
+		{
+			await _db.AddItemAsync(containerName, new
+			{
+				id = "1",
+				Name = "John",
+				OptionalField = "Value1",
+				ConditionalField = "ExistsHere1"
+			});
+
+			await _db.AddItemAsync(containerName, new
+			{
+				id = "2",
+				Name = "Jane",
+				OptionalField = "Value2",
+				ConditionalField = "ExistsHere2"
+			});
+
+			await _db.AddItemAsync(containerName, new
+			{
+				id = "3",
+				Name = "Bob",
+				OptionalField = (string)null
+				// ConditionalField intentionally omitted
+			});
+
+			await _db.AddItemAsync(containerName, new
+			{
+				id = "4",
+				Name = "Alice",
+				OptionalField = (string)null
+				// ConditionalField intentionally omitted
+			});
+		}
+
+		private async Task SeedTestDataForLogicalOperators(string containerName)
+		{
+			// Create multiple documents with varied properties for testing logical operators
+			await _db.AddItemAsync(containerName, new JObject
+			{
+				["id"] = "doc1",
+				["Name"] = "John",
+				["Age"] = 30,
+				["IsPremium"] = true,
+				["Department"] = "Engineering",
+				["Tags"] = JArray.FromObject(new[] { "senior", "backend", "dotnet" })
+			});
+
+			await _db.AddItemAsync(containerName, new JObject
+			{
+				["id"] = "doc2",
+				["Name"] = "Jane",
+				["Age"] = 25,
+				["IsPremium"] = true,
+				["Department"] = "Marketing",
+				["Tags"] = JArray.FromObject(new[] { "junior", "design", "content" })
+			});
+
+			await _db.AddItemAsync(containerName, new JObject
+			{
+				["id"] = "doc3",
+				["Name"] = "Bob",
+				["Age"] = 40,
+				["IsPremium"] = false,
+				["Department"] = "Engineering",
+				["Tags"] = JArray.FromObject(new[] { "senior", "frontend", "react" })
+			});
+
+			await _db.AddItemAsync(containerName, new JObject
+			{
+				["id"] = "doc4",
+				["Name"] = "Alice",
+				["Age"] = 35,
+				["IsPremium"] = false,
+				["Department"] = "Sales",
+				["Tags"] = JArray.FromObject(new[] { "senior", "account", "client" })
 			});
 		}
 

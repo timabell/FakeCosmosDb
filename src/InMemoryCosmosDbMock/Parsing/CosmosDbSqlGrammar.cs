@@ -92,7 +92,10 @@ public static class CosmosDbSqlGrammar
 	// Parsers for function expressions
 	private static readonly Parser<Expression> FunctionExpr =
 		FunctionCallExpr("CONTAINS")
-		.Or(FunctionCallExpr("STARTSWITH"));
+		.Or(FunctionCallExpr("STARTSWITH"))
+		.Or(FunctionCallExpr("IS_NULL"))
+		.Or(FunctionCallExpr("IS_DEFINED"))
+		.Or(FunctionCallExpr("ARRAY_CONTAINS"));
 
 	// Binary operators
 	private static readonly Parser<BinaryOperator> ComparisonOperator =
@@ -113,6 +116,12 @@ public static class CosmosDbSqlGrammar
 	// Forward reference for expression parser (to handle recursion)
 	private static readonly Parser<Expression> ExpressionRef = Parse.Ref(() => ExpressionParser);
 
+	// NOT operator
+	private static readonly Parser<Expression> NotExpr =
+		Keyword("NOT").Token().Then(_ =>
+			Parse.Ref(() => AtomExpr)
+				.Select(expr => (Expression)new UnaryExpression(UnaryOperator.Not, expr)));
+
 	// Atom expressions (constants, property refs, parenthesized expressions)
 	private static readonly Parser<Expression> AtomExpr =
 		ConstantExpr
@@ -121,6 +130,11 @@ public static class CosmosDbSqlGrammar
 		.Or(Parse.Char('(').Token()
 			.Then(_ => ExpressionRef)
 			.Then(expr => Parse.Char(')').Token().Return(expr)));
+
+	// Expression types in order of precedence (lowest to highest)
+	private static readonly Parser<Expression> TermExpr =
+		NotExpr
+		.Or(AtomExpr);
 
 	// Binary expression with operator precedence
 	private static Parser<Expression> Binary(Parser<Expression> operand, Parser<BinaryOperator> op)
@@ -143,13 +157,13 @@ public static class CosmosDbSqlGrammar
 
 	// Main expression parser with operator precedence
 	private static readonly Parser<Expression> ComparisonExpr =
-		AtomExpr.Then(left =>
+		TermExpr.Then(left =>
 			ComparisonOperator.Then(op =>
-				AtomExpr.Select(right =>
+				TermExpr.Select(right =>
 					(Expression)new BinaryExpression(left, op, right))));
 
 	private static readonly Parser<Expression> SimpleExpr =
-		ComparisonExpr.Or(AtomExpr);
+		ComparisonExpr.Or(TermExpr);
 
 	private static readonly Parser<Expression> AndExpr =
 		Binary(SimpleExpr, AndOperator);

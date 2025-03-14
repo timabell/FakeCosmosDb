@@ -340,6 +340,39 @@ public class CosmosDbQueryExecutor
 
 				return false;
 
+			case ComparisonOperator.IsDefined:
+				return propertyValue != null;
+
+			case ComparisonOperator.ArrayContains:
+				if (propertyValue is JArray array)
+				{
+					// Extract the value to search for
+					object searchValue = conditionObj;
+					
+					// If the search value is null, we can't meaningfully search for it
+					if (searchValue == null)
+					{
+						return false;
+					}
+					
+					// Convert the search value to string for comparison
+					string searchString = searchValue.ToString();
+					
+					// Check each element in the array
+					foreach (var element in array)
+					{
+						if (element != null && element.ToString() == searchString)
+						{
+							return true;
+						}
+					}
+					
+					return false;
+				}
+				
+				// If propValue is not an array, return false
+				return false;
+
 			default:
 				if (_logger != null)
 				{
@@ -529,6 +562,57 @@ public class CosmosDbQueryExecutor
 		// Handle null values
 		if (propValue == null)
 		{
+			// Special case for IS_NULL check (represented as Equals with null value)
+			if (operatorEnum == ComparisonOperator.Equals && conditionValue.Type == JTokenType.Null)
+			{
+				return true;
+			}
+			
+			// For IsDefined operator, propValue being null means the property is not defined
+			if (operatorEnum == ComparisonOperator.IsDefined)
+			{
+				return false;
+			}
+			
+			return false;
+		}
+		
+		// For IsDefined operator, if we get here, the property exists
+		if (operatorEnum == ComparisonOperator.IsDefined)
+		{
+			return true;
+		}
+
+		// For ArrayContains operator
+		if (operatorEnum == ComparisonOperator.ArrayContains)
+		{
+			if (propValue is JArray array)
+			{
+				// Extract the value to search for
+				object searchValue = conditionValue.ToObject<object>();
+				
+				// If the search value is null, we can't meaningfully search for it
+				if (searchValue == null)
+				{
+					return false;
+				}
+				
+				// Convert the search value to string for comparison
+				string searchString = searchValue.ToString();
+				
+				// Check each element in the array
+				foreach (var element in array)
+				{
+					if (element != null && element.ToString() == searchString)
+					{
+						return true;
+					}
+				}
+				
+				return false;
+			}
+			
+			// If propValue is not an array, return false
 			return false;
 		}
 

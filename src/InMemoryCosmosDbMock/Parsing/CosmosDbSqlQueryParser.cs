@@ -147,6 +147,7 @@ public class CosmosDbSqlQueryParser
 			{
 				result.WhereConditions = whereConditions;
 			}
+			result.WhereExpression = query.Where.Condition;
 		}
 
 		// Extract ORDER BY
@@ -280,6 +281,41 @@ public class CosmosDbSqlQueryParser
 					PropertyPath = propExpr.PropertyPath,
 					Operator = op,
 					Value = JToken.FromObject(constExpr.Value)
+				});
+			}
+			else if (functionName == "IS_NULL" && 
+					functionCall.Arguments.Count == 1 &&
+					functionCall.Arguments[0] is PropertyExpression propNullExpr)
+			{
+				conditions.Add(new WhereCondition
+				{
+					PropertyPath = propNullExpr.PropertyPath,
+					Operator = ComparisonOperator.Equals,
+					Value = JValue.CreateNull()
+				});
+			}
+			else if (functionName == "IS_DEFINED" &&
+					functionCall.Arguments.Count == 1 &&
+					functionCall.Arguments[0] is PropertyExpression propDefinedExpr)
+			{
+				conditions.Add(new WhereCondition
+				{
+					PropertyPath = propDefinedExpr.PropertyPath,
+					Operator = ComparisonOperator.IsDefined,
+					// Value can be null here since we're just checking if the property exists
+					Value = JValue.CreateNull()
+				});
+			}
+			else if (functionName == "ARRAY_CONTAINS" &&
+					functionCall.Arguments.Count == 2 &&
+					functionCall.Arguments[0] is PropertyExpression propArrayExpr &&
+					functionCall.Arguments[1] is ConstantExpression constArrayExpr)
+			{
+				conditions.Add(new WhereCondition
+				{
+					PropertyPath = propArrayExpr.PropertyPath,
+					Operator = ComparisonOperator.ArrayContains,
+					Value = constArrayExpr.Value != null ? JToken.FromObject(constArrayExpr.Value) : JValue.CreateNull()
 				});
 			}
 		}
@@ -439,6 +475,13 @@ public class ParsedQuery
 	/// List of conditions in the WHERE clause.
 	/// </summary>
 	public List<WhereCondition> WhereConditions { get; set; } = new List<WhereCondition>();
+
+	/// <summary>
+	/// The complete expression tree for the WHERE clause.
+	/// This is used for complex expressions that can't be easily represented as simple conditions,
+	/// such as those involving NOT operator or complex logical combinations.
+	/// </summary>
+	public Expression WhereExpression { get; set; }
 
 	/// <summary>
 	/// List of ORDER BY clauses.
