@@ -161,6 +161,12 @@ public static class CosmosDbSqlGrammar
     private static readonly Parser<Expression> ExpressionParser =
         OrExpr.Or(AndExpr).Or(SimpleExpr);
 
+    // Define reserved keywords
+    private static readonly Parser<string> ReservedKeyword =
+        Keyword("SELECT").Or(Keyword("FROM")).Or(Keyword("WHERE"))
+            .Or(Keyword("ORDER")).Or(Keyword("BY")).Or(Keyword("LIMIT"))
+            .Or(Keyword("ASC")).Or(Keyword("DESC")).Or(Keyword("AND")).Or(Keyword("OR"));
+
     // Helper extension methods for Optional results
     private static T GetOrDefault<T>(this IOption<T> option, T defaultValue = default)
     {
@@ -179,9 +185,15 @@ public static class CosmosDbSqlGrammar
     private static readonly Parser<FromClause> FromClauseParser =
         Keyword("FROM").Then(_ =>
             Identifier.Token().Then(source =>
-                Keyword("AS").Optional().Then(_ =>
-                    Identifier.Token().Optional().Select(alias =>
-                        new FromClause(source, alias.GetOrDefault())))));
+            {
+                // Handle explicit AS keyword followed by an identifier
+                var withAsKeyword = Keyword("AS").Token().Then(_ => Identifier.Token());
+
+                // If alias is not present, don't consume anything
+                var aliasParser = withAsKeyword.Optional();
+
+                return aliasParser.Select(alias => new FromClause(source, alias.GetOrDefault()));
+            }));
 
     // WHERE clause parsing
     private static readonly Parser<WhereClause> WhereClauseParser =
@@ -192,29 +204,32 @@ public static class CosmosDbSqlGrammar
     // ORDER BY clause parsing
     private static readonly Parser<OrderByItem> OrderByItemParser =
         PropertyPath.Token().Then(path =>
-            Keyword("DESC").Return(true).Or(Keyword("ASC").Return(false)).Optional()
+            Keyword("DESC").Token().Return(true)
+                .Or(Keyword("ASC").Token().Return(false))
+                .Optional()
                 .Select(direction => new OrderByItem(path, direction.GetOrDefault(false))));
 
     private static readonly Parser<OrderByClause> OrderByClauseParser =
-        Keyword("ORDER").Then(_ =>
-            Keyword("BY").Then(_ =>
+        Keyword("ORDER").Token().Then(_ =>
+            Keyword("BY").Token().Then(_ =>
                 OrderByItemParser.DelimitedBy(Parse.Char(',').Token())
+                    .Where(items => items.Count() > 0)
                     .Select(items => new OrderByClause(items.ToList()))));
 
     // LIMIT clause parsing
     private static readonly Parser<LimitClause> LimitClauseParser =
-        Keyword("LIMIT").Then(_ =>
-            Parse.Number.Select(value =>
+        Keyword("LIMIT").Token().Then(_ =>
+            Parse.Number.Token().Select(value =>
                 new LimitClause(int.Parse(value))));
 
-    // Complete SQL query parsing
+    // Main query parser, combining all clauses
     private static readonly Parser<CosmosDbSqlQuery> QueryParser =
-        SelectClauseParser.Then(select =>
-            FromClauseParser.Then(from =>
-                WhereClauseParser.Optional().Then(where =>
-                    OrderByClauseParser.Optional().Then(orderBy =>
-                        LimitClauseParser.Optional().Select(limit =>
-                            new CosmosDbSqlQuery(
+        SelectClauseParser.Token()
+            .Then(select => FromClauseParser.Token()
+                .Then(from => WhereClauseParser.Token().Optional()
+                    .Then(where => OrderByClauseParser.Token().Optional()
+                        .Then(orderBy => LimitClauseParser.Token().Optional()
+                            .Select(limit => new CosmosDbSqlQuery(
                                 select,
                                 from,
                                 where.GetOrDefault(),
@@ -229,7 +244,9 @@ public static class CosmosDbSqlGrammar
     {
         try
         {
-            return QueryParser.End().Parse(query);
+            // Remove the .End() call to allow the parser to handle the entire query
+            // and trim whitespace to avoid issues with extraneous spaces
+            return QueryParser.Parse(query.Trim());
         }
         catch (ParseException ex)
         {
