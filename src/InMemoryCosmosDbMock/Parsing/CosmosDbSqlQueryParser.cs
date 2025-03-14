@@ -271,8 +271,8 @@ public class CosmosDbSqlQueryParser
 				functionCall.Arguments[0] is PropertyExpression propExpr &&
 				functionCall.Arguments[1] is ConstantExpression constExpr)
 			{
-				var op = functionName == "CONTAINS" ? 
-					ComparisonOperator.StringContains : 
+				var op = functionName == "CONTAINS" ?
+					ComparisonOperator.StringContains :
 					ComparisonOperator.StringStartsWith;
 
 				conditions.Add(new WhereCondition

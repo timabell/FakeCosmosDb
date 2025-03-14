@@ -246,6 +246,14 @@ public class CosmosDbQueryExecutor
 						conditionObj = conditionValue.ToString();
 						break;
 				}
+
+				if (_logger != null)
+				{
+					_logger.LogDebug("Extracted condition value: {value} (Type: {type})",
+						conditionObj, conditionObj?.GetType().Name ?? "null");
+					_logger.LogDebug("Property value for comparison: {value} (Type: {type})",
+						propertyValue.ToString(), propertyValue.Type.ToString());
+				}
 			}
 			catch (Exception ex)
 			{
@@ -270,15 +278,23 @@ public class CosmosDbQueryExecutor
 			case ComparisonOperator.Equals:
 				if (propertyValue.Type == JTokenType.String && conditionObj is string stringValue)
 				{
-					var result = string.Equals(propertyValue.Value<string>(), stringValue, StringComparison.OrdinalIgnoreCase);
+					string propStringValue = propertyValue.Value<string>();
+					var result = string.Equals(propStringValue, stringValue, StringComparison.OrdinalIgnoreCase);
 					if (_logger != null)
 					{
 						_logger.LogDebug("String equality check: '{property}' = '{value}' => {result}",
-							propertyValue.Value<string>(), stringValue, result);
+							propStringValue, stringValue, result);
 					}
 					return result;
 				}
-				return JToken.DeepEquals(propertyValue, JToken.FromObject(conditionObj));
+
+				var equality = JToken.DeepEquals(propertyValue, JToken.FromObject(conditionObj));
+				if (_logger != null)
+				{
+					_logger.LogDebug("Deep equality check: '{property}' = '{value}' => {result}",
+						propertyValue.ToString(), conditionObj?.ToString() ?? "null", equality);
+				}
+				return equality;
 
 			case ComparisonOperator.NotEquals:
 				return !JToken.DeepEquals(propertyValue, JToken.FromObject(conditionObj));
@@ -590,24 +606,74 @@ public class CosmosDbQueryExecutor
 			var leftValue = EvaluateValue(item, binary.Left);
 			var rightValue = EvaluateValue(item, binary.Right);
 
+			if (_logger != null)
+			{
+				_logger.LogDebug("Comparing values: '{left}' ({leftType}) {op} '{right}' ({rightType})",
+					leftValue, leftValue?.GetType().Name,
+					binary.Operator,
+					rightValue, rightValue?.GetType().Name);
+			}
+
 			switch (binary.Operator)
 			{
 				case BinaryOperator.Equal:
+					// Handle string comparison for JValue objects
+					if (leftValue is JValue leftJValue && leftJValue.Type == JTokenType.String)
+					{
+						string leftStr = leftJValue.Value<string>();
+						string rightStr = rightValue is JValue rightJValue && rightJValue.Type == JTokenType.String
+							? rightJValue.Value<string>()
+							: rightValue as string;
+
+						if (rightStr != null)
+						{
+							if (_logger != null)
+							{
+								_logger.LogDebug("JValue string comparison: '{left}' = '{right}'", leftStr, rightStr);
+							}
+							return string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
+						}
+					}
 					return Equals(leftValue, rightValue);
+
 				case BinaryOperator.NotEqual:
+					// Handle string comparison for JValue objects
+					if (leftValue is JValue leftJValueNE && leftJValueNE.Type == JTokenType.String)
+					{
+						string leftStr = leftJValueNE.Value<string>();
+						string rightStr = rightValue is JValue rightJValueNE && rightJValueNE.Type == JTokenType.String
+							? rightJValueNE.Value<string>()
+							: rightValue as string;
+
+						if (rightStr != null)
+						{
+							if (_logger != null)
+							{
+								_logger.LogDebug("JValue string not-equals comparison: '{left}' != '{right}'", leftStr, rightStr);
+							}
+							return !string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
+						}
+					}
 					return !Equals(leftValue, rightValue);
+
 				case BinaryOperator.GreaterThan:
 					return CompareValues(leftValue, rightValue) > 0;
+
 				case BinaryOperator.LessThan:
 					return CompareValues(leftValue, rightValue) < 0;
+
 				case BinaryOperator.GreaterThanOrEqual:
 					return CompareValues(leftValue, rightValue) >= 0;
+
 				case BinaryOperator.LessThanOrEqual:
 					return CompareValues(leftValue, rightValue) <= 0;
+
 				case BinaryOperator.And:
 					return EvaluateExpression(item, binary.Left) && EvaluateExpression(item, binary.Right);
+
 				case BinaryOperator.Or:
 					return EvaluateExpression(item, binary.Left) || EvaluateExpression(item, binary.Right);
+
 				default:
 					throw new NotImplementedException($"Operator {binary.Operator} not implemented");
 			}
@@ -724,7 +790,26 @@ public class CosmosDbQueryExecutor
 		{
 			try
 			{
-				return comparable.CompareTo(right);
+				// Convert value to the same type as propValue if possible
+				if (left is int)
+				{
+					right = Convert.ToInt32(right);
+				}
+				else if (left is double)
+				{
+					right = Convert.ToDouble(right);
+				}
+				else if (left is decimal)
+				{
+					right = Convert.ToDecimal(right);
+				}
+				else if (left is long)
+				{
+					right = Convert.ToInt64(right);
+				}
+
+				int comparison = comparable.CompareTo(right);
+				return comparison;
 			}
 			catch
 			{
