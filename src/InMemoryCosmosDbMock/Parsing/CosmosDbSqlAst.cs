@@ -55,7 +55,7 @@ public abstract class SelectItem
 public class SelectAllItem : SelectItem
 {
     public static readonly SelectAllItem Instance = new SelectAllItem();
-    private SelectAllItem() { }
+    public SelectAllItem() { }
 }
 
 /// <summary>

@@ -14,43 +14,46 @@ public static class CosmosDbSqlGrammar
 
     // Whitespace handling
     private static readonly Parser<string> Spaces = Parse.WhiteSpace.Many().Text();
-    private static readonly Parser<T> Token<T>(this Parser<T> parser) =>
-        from leading in Spaces
-        from item in parser
-        from trailing in Spaces
-        select item;
+    
+    private static Parser<T> Token<T>(this Parser<T> parser)
+    {
+        return parser.Then(item => 
+            Spaces.Then(_ => Parse.Return(item)))
+            .Preturn(Spaces);
+    }
 
     // SQL keywords (case insensitive)
-    private static Parser<string> Keyword(string word) =>
-        Parse.IgnoreCase(word).Token();
+    private static Parser<string> Keyword(string word)
+    {
+        return Parse.IgnoreCase(word).Token();
+    }
 
     // Identifiers for table and column names
     public static readonly Parser<string> Identifier =
-        from first in Parse.Letter.Once()
-        from rest in Parse.LetterOrDigit.Or(Parse.Char('_')).Many()
-        select new string(first.Concat(rest).ToArray());
+        Parse.Letter.Once().Concat(Parse.LetterOrDigit.Or(Parse.Char('_')).Many())
+            .Select(chars => new string(chars.ToArray()));
 
     // Property path (e.g., "c.Address.City")
     public static readonly Parser<string> PropertyPath =
-        from parts in Identifier.DelimitedBy(Parse.Char('.'))
-        select string.Join(".", parts);
+        Identifier.DelimitedBy(Parse.Char('.')).Select(parts => string.Join(".", parts));
 
     // String literals
     public static readonly Parser<string> StringLiteral =
-        from open in Parse.Char('\'')
-        from content in Parse.CharExcept('\'').Many().Text()
-        from close in Parse.Char('\'')
-        select content;
+        Parse.Char('\'').Then(_ => 
+            Parse.CharExcept('\'').Many().Text().Then(content => 
+                Parse.Char('\'').Return(content)));
 
     // Numeric literals
     public static readonly Parser<double> NumberLiteral =
-        from sign in Parse.Char('-').Optional()
-        from whole in Parse.Digit.AtLeastOnce().Text()
-        from dot in Parse.Char('.').Optional()
-        from fraction in dot.IsEmpty
-            ? Parse.Return("")
-            : Parse.Digit.Many().Text()
-        select double.Parse((sign.IsDefined ? "-" : "") + whole + (dot.IsDefined ? "." + fraction : ""));
+        Parse.Char('-').Optional().Then(sign => 
+            Parse.Digit.AtLeastOnce().Text().Then(whole => 
+                Parse.Char('.').Optional().Then(dot => 
+                    (dot.IsDefined 
+                        ? Parse.Digit.Many().Text() 
+                        : Parse.Return("")).Select(fraction => {
+                            string number = (sign.IsDefined ? "-" : "") + whole + (dot.IsDefined ? "." + fraction : "");
+                            return double.Parse(number);
+                        }))));
 
     // Boolean literals
     public static readonly Parser<bool> BooleanLiteral =
@@ -68,126 +71,153 @@ public static class CosmosDbSqlGrammar
         .Or(BooleanLiteral.Select(b => (object)b))
         .Or(NullLiteral);
 
-    // Basic expressions
-    private static readonly Parser<Expression> LiteralExpression =
-        Literal.Select(value => new ConstantExpression(value));
+    // Expression parsers
+    private static readonly Parser<Expression> ConstantExpr =
+        Literal.Select(value => (Expression)new ConstantExpression(value));
 
-    private static readonly Parser<Expression> PropertyExpression =
-        PropertyPath.Select(path => new PropertyExpression(path));
+    private static readonly Parser<Expression> PropertyExpr =
+        PropertyPath.Token().Select(path => (Expression)new PropertyExpression(path));
 
-    // Function calls like CONTAINS() and STARTSWITH()
-    private static readonly Parser<Expression> FunctionCallExpression =
-        from name in Identifier
-        from lparen in Parse.Char('(').Token()
-        from args in Parse.Ref(() => Expression).DelimitedBy(Parse.Char(',').Token())
-        from rparen in Parse.Char(')').Token()
-        select new FunctionCallExpression(name.ToUpperInvariant(), args.ToList());
+    // Function call expressions (CONTAINS, STARTSWITH, etc.)
+    private static Parser<Expression> FunctionCallExpr(string name)
+    {
+        return Parse.IgnoreCase(name).Token()
+            .Then(_ => Parse.Char('(').Token())
+            .Then(_ => Parse.Ref(() => ExpressionParser).DelimitedBy(Parse.Char(',').Token()))
+            .Then(args => Parse.Char(')').Token().Return((Expression)new FunctionCallExpression(name, args.ToList())));
+    }
 
-    // Parenthesized expressions
-    private static readonly Parser<Expression> ParenthesizedExpression =
-        from lparen in Parse.Char('(').Token()
-        from expr in Parse.Ref(() => Expression)
-        from rparen in Parse.Char(')').Token()
-        select expr;
+    // Parsers for function expressions
+    private static readonly Parser<Expression> FunctionExpr =
+        FunctionCallExpr("CONTAINS")
+        .Or(FunctionCallExpr("STARTSWITH"));
 
-    // Primary expressions
-    private static readonly Parser<Expression> PrimaryExpression =
-        LiteralExpression
-        .Or(FunctionCallExpression)
-        .Or(PropertyExpression)
-        .Or(ParenthesizedExpression);
-
-    // Binary operators with precedence
-    private static readonly Parser<BinaryOperator> EqualityOperator =
-        Keyword("=").Return(BinaryOperator.Equal)
-        .Or(Keyword("!=").Return(BinaryOperator.NotEqual))
-        .Or(Keyword("<>").Return(BinaryOperator.NotEqual));
-
+    // Binary operators
     private static readonly Parser<BinaryOperator> ComparisonOperator =
-        Keyword(">=").Return(BinaryOperator.GreaterThanOrEqual)
-        .Or(Keyword(">").Return(BinaryOperator.GreaterThan))
-        .Or(Keyword("<=").Return(BinaryOperator.LessThanOrEqual))
-        .Or(Keyword("<").Return(BinaryOperator.LessThan));
+        Parse.String("=").Token().Return(BinaryOperator.Equal)
+        .Or(Parse.String("!=").Token().Return(BinaryOperator.NotEqual))
+        .Or(Parse.String("<>").Token().Return(BinaryOperator.NotEqual))
+        .Or(Parse.String("<=").Token().Return(BinaryOperator.LessThanOrEqual))
+        .Or(Parse.String(">=").Token().Return(BinaryOperator.GreaterThanOrEqual))
+        .Or(Parse.String("<").Token().Return(BinaryOperator.LessThan))
+        .Or(Parse.String(">").Token().Return(BinaryOperator.GreaterThan));
 
-    private static readonly Parser<BinaryOperator> LogicalOperator =
-        Keyword("AND").Return(BinaryOperator.And)
-        .Or(Keyword("OR").Return(BinaryOperator.Or));
+    private static readonly Parser<BinaryOperator> AndOperator =
+        Keyword("AND").Return(BinaryOperator.And);
 
-    // Build expressions with operator precedence
-    public static readonly Parser<Expression> Expression = Parse.ChainOperator(
-        LogicalOperator,
-        ParseComparisonExpression,
-        (op, left, right) => new BinaryExpression(left, op, right));
+    private static readonly Parser<BinaryOperator> OrOperator =
+        Keyword("OR").Return(BinaryOperator.Or);
 
-    private static readonly Parser<Expression> ParseComparisonExpression = Parse.ChainOperator(
-        EqualityOperator.Or(ComparisonOperator),
-        PrimaryExpression,
-        (op, left, right) => new BinaryExpression(left, op, right));
+    // Forward reference for expression parser (to handle recursion)
+    private static readonly Parser<Expression> ExpressionRef = Parse.Ref(() => ExpressionParser);
 
-    // Parse SELECT clause
-    private static readonly Parser<SelectItem> SelectAllItem =
-        Parse.Char('*').Select(_ => (SelectItem)SelectAllItem.Instance);
+    // Atom expressions (constants, property refs, parenthesized expressions)
+    private static readonly Parser<Expression> AtomExpr =
+        ConstantExpr
+        .Or(FunctionExpr)
+        .Or(PropertyExpr)
+        .Or(Parse.Char('(').Token()
+            .Then(_ => ExpressionRef)
+            .Then(expr => Parse.Char(')').Token().Return(expr)));
 
-    private static readonly Parser<SelectItem> PropertySelectItem =
-        PropertyPath.Select(path => (SelectItem)new PropertySelectItem(path));
+    // Binary expression with operator precedence
+    private static Parser<Expression> Binary(Parser<Expression> operand, Parser<BinaryOperator> op)
+    {
+        return operand.Then(first => 
+            op.Then(operator1 => operand).Many().Select(rest => {
+                Expression result = first;
+                foreach (var pair in rest)
+                {
+                    result = new BinaryExpression(result, pair.Item1, pair.Item2);
+                }
+                return result;
+            }));
+    }
 
-    private static readonly Parser<SelectItem> SelectItemParser =
-        SelectAllItem.Or(PropertySelectItem);
+    // Main expression parser with operator precedence
+    private static readonly Parser<Expression> ComparisonExpr =
+        AtomExpr.Then(left => 
+            ComparisonOperator.Then(op => 
+                AtomExpr.Select(right => 
+                    (Expression)new BinaryExpression(left, op, right))));
 
+    private static readonly Parser<Expression> SimpleExpr =
+        ComparisonExpr.Or(AtomExpr);
+
+    private static readonly Parser<Expression> AndExpr =
+        Binary(SimpleExpr, AndOperator);
+
+    private static readonly Parser<Expression> OrExpr =
+        Binary(AndExpr.Or(SimpleExpr), OrOperator);
+
+    // The main expression parser with precedence: OR > AND > Comparison > Atom
+    private static readonly Parser<Expression> ExpressionParser =
+        OrExpr.Or(AndExpr).Or(SimpleExpr);
+
+    // Helper extension methods for Optional results
+    private static T GetOrDefault<T>(this IOption<T> option, T defaultValue = default)
+    {
+        return option.IsDefined ? option.Get() : defaultValue;
+    }
+
+    // SELECT clause parsing
     private static readonly Parser<SelectClause> SelectClauseParser =
-        from select in Keyword("SELECT")
-        from items in SelectItemParser.DelimitedBy(Parse.Char(',').Token())
-        select new SelectClause(items.ToList());
+        Keyword("SELECT").Then(_ => 
+            Parse.Char('*').Token().Select(_ => (IReadOnlyList<SelectItem>)new List<SelectItem> { new SelectAllItem() })
+            .Or(PropertyPath.Token().DelimitedBy(Parse.Char(',').Token())
+                .Select(paths => (IReadOnlyList<SelectItem>)paths.Select(p => (SelectItem)new PropertySelectItem(p)).ToList()))
+            .Select(items => new SelectClause(items)));
 
-    // Parse FROM clause
+    // FROM clause parsing
     private static readonly Parser<FromClause> FromClauseParser =
-        from from in Keyword("FROM")
-        from source in Identifier.Token()
-        from alias in (
-            from as_kw in Keyword("AS").Optional()
-            from alias_id in Identifier.Token()
-            select alias_id
-        ).Optional()
-        select new FromClause(source, alias.GetOrDefault());
+        Keyword("FROM").Then(_ => 
+            Identifier.Token().Then(source => 
+                Keyword("AS").Optional().Then(_ => 
+                    Identifier.Token().Optional().Select(alias => 
+                        new FromClause(source, alias.GetOrDefault())))));
 
-    // Parse WHERE clause
+    // WHERE clause parsing
     private static readonly Parser<WhereClause> WhereClauseParser =
-        from where in Keyword("WHERE")
-        from condition in Expression
-        select new WhereClause(condition);
+        Keyword("WHERE").Then(_ => 
+            ExpressionParser.Select(condition => 
+                new WhereClause(condition)));
 
-    // Parse ORDER BY clause
+    // ORDER BY clause parsing
     private static readonly Parser<OrderByItem> OrderByItemParser =
-        from prop in PropertyPath.Token()
-        from direction in Keyword("DESC").Return(true).Or(Keyword("ASC").Return(false)).Optional()
-        select new OrderByItem(prop, direction.GetOrDefault());
+        PropertyPath.Token().Then(path => 
+            Keyword("DESC").Return(true).Or(Keyword("ASC").Return(false)).Optional()
+                .Select(direction => new OrderByItem(path, direction.GetOrDefault(false))));
 
     private static readonly Parser<OrderByClause> OrderByClauseParser =
-        from orderby in Keyword("ORDER").Then(_ => Keyword("BY"))
-        from items in OrderByItemParser.DelimitedBy(Parse.Char(',').Token())
-        select new OrderByClause(items.ToList());
+        Keyword("ORDER").Then(_ => 
+            Keyword("BY").Then(_ => 
+                OrderByItemParser.DelimitedBy(Parse.Char(',').Token())
+                    .Select(items => new OrderByClause(items.ToList()))));
 
-    // Parse LIMIT clause (CosmosDB uses OFFSET/LIMIT)
+    // LIMIT clause parsing
     private static readonly Parser<LimitClause> LimitClauseParser =
-        from limit in Keyword("LIMIT")
-        from value in Parse.Number.Select(int.Parse)
-        select new LimitClause(value);
+        Keyword("LIMIT").Then(_ => 
+            Parse.Number.Select(value => 
+                new LimitClause(int.Parse(value))));
 
-    // Parse a complete CosmosDB SQL query
-    public static readonly Parser<CosmosDbSqlQuery> QueryParser =
-        from select in SelectClauseParser
-        from from in FromClauseParser
-        from where in WhereClauseParser.Optional()
-        from orderBy in OrderByClauseParser.Optional()
-        from limit in LimitClauseParser.Optional()
-        select new CosmosDbSqlQuery(
-            select,
-            from,
-            where.GetOrDefault(),
-            orderBy.GetOrDefault(),
-            limit.GetOrDefault());
+    // Complete SQL query parsing
+    private static readonly Parser<CosmosDbSqlQuery> QueryParser =
+        SelectClauseParser.Then(select => 
+            FromClauseParser.Then(from => 
+                WhereClauseParser.Optional().Then(where => 
+                    OrderByClauseParser.Optional().Then(orderBy => 
+                        LimitClauseParser.Optional().Select(limit => 
+                            new CosmosDbSqlQuery(
+                                select, 
+                                from, 
+                                where.GetOrDefault(), 
+                                orderBy.GetOrDefault(), 
+                                limit.GetOrDefault()
+                            ))))));
 
-    // Helper method to actually parse a query string
+    /// <summary>
+    /// Parses a CosmosDB SQL query string into an AST.
+    /// </summary>
     public static CosmosDbSqlQuery ParseQuery(string query)
     {
         try
