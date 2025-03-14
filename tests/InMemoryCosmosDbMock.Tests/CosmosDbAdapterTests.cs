@@ -1,6 +1,10 @@
 using System.Linq;
 using System.Threading.Tasks;
+using InMemoryCosmosDbMock.Tests.Utilities;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Logging;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace TimAbell.MockableCosmos.Tests;
 
@@ -8,13 +12,21 @@ public class CosmosDbAdapterTests
 {
 	private readonly string _containerName = "AdapterTest";
 	private readonly string _mockConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
+	private readonly ITestOutputHelper _output;
+
+	public CosmosDbAdapterTests(ITestOutputHelper output)
+	{
+		_output = output;
+	}
 
 	// Skip these tests when running in CI since they require the CosmosDB Emulator
 	[Fact(Skip = "Requires CosmosDB Emulator")]
 	public async Task Adapter_CanBeUsedWithCosmosDbInterface()
 	{
 		// Arrange
-		var mockAdapter = new CosmosDbAdapter(_mockConnectionString);
+		var logger = new TestLogger(_output);
+		var clientOptions = new CosmosClientOptions();
+		var mockAdapter = new CosmosDbAdapter(_mockConnectionString, clientOptions, logger);
 		await mockAdapter.AddContainerAsync(_containerName);
 
 		// Act - Add an item
@@ -34,7 +46,9 @@ public class CosmosDbAdapterTests
 	public async Task Adapter_SupportsPagination()
 	{
 		// Arrange
-		var mockAdapter = new CosmosDbAdapter(_mockConnectionString);
+		var logger = new TestLogger(_output);
+		var clientOptions = new CosmosClientOptions();
+		var mockAdapter = new CosmosDbAdapter(_mockConnectionString, clientOptions, logger);
 		await mockAdapter.AddContainerAsync(_containerName);
 
 		// Add 20 items
@@ -72,7 +86,9 @@ public class CosmosDbAdapterTests
 	public async Task Adapter_HandlesAdvancedQueries()
 	{
 		// Arrange
-		var mockAdapter = new CosmosDbAdapter(_mockConnectionString);
+		var logger = new TestLogger(_output);
+		var clientOptions = new CosmosClientOptions();
+		var mockAdapter = new CosmosDbAdapter(_mockConnectionString, clientOptions, logger);
 		await mockAdapter.AddContainerAsync(_containerName);
 
 		// Add test items

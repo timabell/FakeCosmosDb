@@ -1,4 +1,8 @@
 using System;
+using InMemoryCosmosDbMock.Tests.Utilities;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Logging;
+using Xunit.Abstractions;
 
 namespace TimAbell.MockableCosmos.Tests;
 
@@ -6,18 +10,22 @@ public class CosmosDbTestFixture : IDisposable
 {
 	public ICosmosDb Db { get; }
 	public string ContainerName = "TestContainer";
+	private readonly ILogger _logger;
 
-	public CosmosDbTestFixture(bool useRealCosmos)
+	public CosmosDbTestFixture(bool useRealCosmos, ITestOutputHelper output = null)
 	{
+		_logger = output != null ? new TestLogger(output) : null;
+		
 		if (useRealCosmos)
 		{
 			// Use CosmosDB Emulator
-			Db = new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;");
+			var clientOptions = new CosmosClientOptions();
+			Db = new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;", clientOptions, _logger);
 		}
 		else
 		{
 			// Use In-Memory Mock
-			Db = new CosmosInMemoryCosmosDb();
+			Db = new CosmosInMemoryCosmosDb(_logger);
 		}
 
 		Db.AddContainerAsync(ContainerName).Wait();

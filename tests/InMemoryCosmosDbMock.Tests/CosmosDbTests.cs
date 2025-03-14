@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using InMemoryCosmosDbMock.Tests.Utilities;
-using InMemoryCosmosDbMock.Tests.Utilities;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
@@ -11,12 +10,10 @@ namespace TimAbell.MockableCosmos.Tests;
 
 public class CosmosDbTests
 {
-	private readonly ITestOutputHelper _output;
 	private static ILogger _logger;
 
 	public CosmosDbTests(ITestOutputHelper output)
 	{
-		_output = output;
 		_logger = new TestLogger(output);
 	}
 

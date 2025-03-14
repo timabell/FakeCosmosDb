@@ -1,5 +1,7 @@
 using System.Linq;
 using FluentAssertions;
+using InMemoryCosmosDbMock.Tests.Utilities;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TimAbell.MockableCosmos;
 using TimAbell.MockableCosmos.Parsing;
@@ -10,7 +12,7 @@ namespace InMemoryCosmosDbMock.Tests;
 
 public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 {
-	private readonly CosmosDbSqlQueryParser _parser = new CosmosDbSqlQueryParser();
+	private readonly CosmosDbSqlQueryParser _parser = new CosmosDbSqlQueryParser(new TestLogger(output));
 
 	[Fact]
 	public void ShouldParseSimpleSelectQuery()
@@ -193,7 +195,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	public void ShouldHandleQuotedStringsInWhereConditions()
 	{
 		// Arrange
-		var parser = new CosmosDbSqlQueryParser();
+		var parser = new CosmosDbSqlQueryParser(new TestLogger(output));
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act
@@ -213,7 +215,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	public void ShouldHandleIntegrationTestQuery()
 	{
 		// This exact query is used in the integration test
-		var parser = new CosmosDbSqlQueryParser();
+		var parser = new CosmosDbSqlQueryParser(new TestLogger(output));
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act
