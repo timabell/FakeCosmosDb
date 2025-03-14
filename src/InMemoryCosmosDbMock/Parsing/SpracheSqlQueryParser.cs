@@ -17,14 +17,39 @@ public class SpracheSqlQueryParser : ICosmosDbQueryParser
     {
         try
         {
+            // Add logging to trace through the parsing process
+            Console.WriteLine($"SpracheSqlQueryParser: Parsing query '{query}'");
+
             // First try to parse with the grammar
             var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
+            Console.WriteLine($"SpracheSqlQueryParser: Successfully parsed AST: {parsedQuery}");
+
             var result = ConvertToLegacyParsedQuery(parsedQuery);
+
+            // Log the extracted WHERE conditions for debugging
+            if (result.WhereConditions != null)
+            {
+                Console.WriteLine($"SpracheSqlQueryParser: Extracted {result.WhereConditions.Count} WHERE conditions:");
+                foreach (var condition in result.WhereConditions)
+                {
+                    Console.WriteLine($"  - {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
+                }
+            }
+            else
+            {
+                Console.WriteLine("SpracheSqlQueryParser: No WHERE conditions extracted");
+            }
+
+            // Log the legacy parsed query properties
+            Console.WriteLine($"SpracheSqlQueryParser: Legacy ParsedQuery: FromName={result.FromName}, FromAlias={result.FromAlias}");
+            Console.WriteLine($"SpracheSqlQueryParser: PropertyPaths={string.Join(", ", result.PropertyPaths)}");
+            Console.WriteLine($"SpracheSqlQueryParser: Limit={result.Limit}");
 
             // If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
             if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
                 (query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
             {
+                Console.WriteLine("SpracheSqlQueryParser: Using fallback parser for ORDER BY and LIMIT");
                 FallbackParseOrderByAndLimit(query, result);
             }
 
@@ -32,7 +57,63 @@ public class SpracheSqlQueryParser : ICosmosDbQueryParser
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"SpracheSqlQueryParser: Error parsing query: {ex.Message}");
             throw new FormatException($"Failed to parse CosmosDB SQL query: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Dumps the current state of the parser for diagnostic purposes.
+    /// </summary>
+    public string DumpDebugInfo(string query)
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"Original query: {query}");
+
+            var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
+            sb.AppendLine($"AST: {parsedQuery}");
+
+            var legacyQuery = ConvertToLegacyParsedQuery(parsedQuery);
+            sb.AppendLine("\nLegacy ParsedQuery:");
+            sb.AppendLine($"- FromName: {legacyQuery.FromName}");
+            sb.AppendLine($"- FromAlias: {legacyQuery.FromAlias}");
+            sb.AppendLine($"- PropertyPaths: {string.Join(", ", legacyQuery.PropertyPaths)}");
+
+            if (legacyQuery.WhereConditions != null)
+            {
+                sb.AppendLine($"- WhereConditions ({legacyQuery.WhereConditions.Count}):");
+                foreach (var condition in legacyQuery.WhereConditions)
+                {
+                    sb.AppendLine($"  * {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
+                }
+            }
+            else
+            {
+                sb.AppendLine("- WhereConditions: null");
+            }
+
+            if (legacyQuery.OrderBy != null)
+            {
+                sb.AppendLine($"- OrderBy ({legacyQuery.OrderBy.Count}):");
+                foreach (var order in legacyQuery.OrderBy)
+                {
+                    sb.AppendLine($"  * {order.PropertyPath} {order.Direction}");
+                }
+            }
+            else
+            {
+                sb.AppendLine("- OrderBy: null");
+            }
+
+            sb.AppendLine($"- Limit: {legacyQuery.Limit}");
+
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            return $"Error dumping debug info: {ex.Message}";
         }
     }
 

@@ -26,6 +26,32 @@ public class CosmosDbSqlQuery
         OrderBy = orderBy;
         Limit = limit;
     }
+
+    public override string ToString()
+    {
+        var parts = new List<string>
+        {
+            Select.ToString(),
+            From.ToString()
+        };
+
+        if (Where != null)
+        {
+            parts.Add(Where.ToString());
+        }
+
+        if (OrderBy != null)
+        {
+            parts.Add(OrderBy.ToString());
+        }
+
+        if (Limit != null)
+        {
+            parts.Add(Limit.ToString());
+        }
+
+        return string.Join(" ", parts);
+    }
 }
 
 /// <summary>
@@ -39,6 +65,25 @@ public class SelectClause
     public SelectClause(IReadOnlyList<SelectItem> items)
     {
         Items = items;
+    }
+
+    public override string ToString()
+    {
+        if (IsSelectAll)
+        {
+            return "SELECT *";
+        }
+
+        var propertyPaths = new List<string>();
+        foreach (var item in Items)
+        {
+            if (item is PropertySelectItem propertyItem)
+            {
+                propertyPaths.Add(propertyItem.PropertyPath);
+            }
+        }
+
+        return $"SELECT {string.Join(", ", propertyPaths)}";
     }
 }
 
@@ -84,6 +129,11 @@ public class FromClause
         Source = source;
         Alias = alias;
     }
+
+    public override string ToString()
+    {
+        return Alias != null ? $"FROM {Source} AS {Alias}" : $"FROM {Source}";
+    }
 }
 
 /// <summary>
@@ -97,6 +147,8 @@ public class WhereClause
     {
         Condition = condition;
     }
+
+    public override string ToString() => $"WHERE {Condition}";
 }
 
 /// <summary>
@@ -110,6 +162,8 @@ public class OrderByClause
     {
         Items = items;
     }
+
+    public override string ToString() => $"ORDER BY {string.Join(", ", Items)}";
 }
 
 /// <summary>
@@ -125,6 +179,8 @@ public class OrderByItem
         PropertyPath = propertyPath;
         Descending = descending;
     }
+
+    public override string ToString() => Descending ? $"{PropertyPath} DESC" : $"{PropertyPath} ASC";
 }
 
 /// <summary>
@@ -138,6 +194,8 @@ public class LimitClause
     {
         Value = value;
     }
+
+    public override string ToString() => $"LIMIT {Value}";
 }
 
 /// <summary>
@@ -145,6 +203,7 @@ public class LimitClause
 /// </summary>
 public abstract class Expression
 {
+    public abstract override string ToString();
 }
 
 /// <summary>
@@ -162,6 +221,8 @@ public class BinaryExpression : Expression
         Operator = op;
         Right = right;
     }
+
+    public override string ToString() => $"({Left} {Operator} {Right})";
 }
 
 /// <summary>
@@ -190,6 +251,8 @@ public class PropertyExpression : Expression
     {
         PropertyPath = propertyPath;
     }
+
+    public override string ToString() => PropertyPath;
 }
 
 /// <summary>
@@ -203,6 +266,8 @@ public class ConstantExpression : Expression
     {
         Value = value;
     }
+
+    public override string ToString() => Value?.ToString() ?? "null";
 }
 
 /// <summary>
@@ -219,4 +284,6 @@ public class FunctionCallExpression : Expression
         FunctionName = functionName;
         Arguments = arguments;
     }
+
+    public override string ToString() => $"{FunctionName}({string.Join(", ", Arguments)})";
 }

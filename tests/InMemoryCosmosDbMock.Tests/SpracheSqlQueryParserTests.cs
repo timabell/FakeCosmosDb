@@ -4,10 +4,11 @@ using Newtonsoft.Json.Linq;
 using TimAbell.MockableCosmos;
 using TimAbell.MockableCosmos.Parsing;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace InMemoryCosmosDbMock.Tests;
 
-public class SpracheSqlQueryParserTests
+public class SpracheSqlQueryParserTests(ITestOutputHelper output)
 {
     private readonly ICosmosDbQueryParser _parser = new SpracheSqlQueryParser();
 
@@ -206,5 +207,37 @@ public class SpracheSqlQueryParserTests
         result.WhereConditions[0].Operator.Should().Be("=");
         result.WhereConditions[0].Value.Type.Should().Be(JTokenType.String);
         result.WhereConditions[0].Value.ToString().Should().Be("Alice");
+    }
+
+    [Fact]
+    public void ShouldHandleIntegrationTestQuery()
+    {
+        // This exact query is used in the integration test
+        var parser = new SpracheSqlQueryParser();
+        var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
+
+        // Act
+        var result = parser.Parse(sql);
+
+        // Output the debug info
+        output.WriteLine(parser.DumpDebugInfo(sql));
+
+        // Assert
+        result.Should().NotBeNull();
+        result.PropertyPaths.Should().NotBeNull();
+        result.PropertyPaths.Should().HaveCount(1);
+        result.PropertyPaths[0].Should().Be("*");
+
+        result.FromName.Should().Be("c");
+        result.FromAlias.Should().BeNull();
+
+        result.WhereConditions.Should().NotBeNull();
+        result.WhereConditions.Should().HaveCount(1);
+
+        var whereCondition = result.WhereConditions[0];
+        whereCondition.PropertyPath.Should().Be("c.Name");
+        whereCondition.Operator.Should().Be("=");
+        whereCondition.Value.Type.Should().Be(JTokenType.String);
+        whereCondition.Value.Value<string>().Should().Be("Alice");
     }
 }
