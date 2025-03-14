@@ -727,6 +727,32 @@ public class CosmosDbQueryExecutor
 							}
 						}
 					}
+					// Handle boolean comparisons
+					else if (leftValue is JValue leftBoolJValue && leftBoolJValue.Type == JTokenType.Boolean)
+					{
+						var leftBool = leftBoolJValue.Value<bool>();
+						if (_logger != null)
+						{
+							_logger.LogDebug("JValue boolean comparison: {left} = {right}", leftBool, rightValue);
+						}
+
+						// Check if rightValue is a direct boolean
+						if (rightValue is bool rightBoolValue)
+						{
+							return leftBool == rightBoolValue;
+						}
+						// Check if rightValue is a JValue Boolean
+						else if (rightValue is JValue rightBoolJValue && rightBoolJValue.Type == JTokenType.Boolean)
+						{
+							var rightBool = rightBoolJValue.Value<bool>();
+							return leftBool == rightBool;
+						}
+						// Try to parse as boolean string
+						else if (bool.TryParse(rightValue?.ToString(), out bool parsedBool))
+						{
+							return leftBool == parsedBool;
+						}
+					}
 
 					return Equals(leftValue, rightValue);
 
