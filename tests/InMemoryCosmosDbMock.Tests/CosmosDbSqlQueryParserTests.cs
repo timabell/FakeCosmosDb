@@ -1,5 +1,7 @@
 using System.Linq;
 using FluentAssertions;
+using InMemoryCosmosDbMock.Tests.Utilities;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TimAbell.MockableCosmos;
 using TimAbell.MockableCosmos.Parsing;
@@ -10,7 +12,7 @@ namespace InMemoryCosmosDbMock.Tests;
 
 public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 {
-	private readonly CosmosDbSqlQueryParser _parser = new CosmosDbSqlQueryParser();
+	private readonly CosmosDbSqlQueryParser _parser = new CosmosDbSqlQueryParser(new TestLogger(output));
 
 	[Fact]
 	public void ShouldParseSimpleSelectQuery()
@@ -57,7 +59,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.FromName.Should().Be("c");
 		result.WhereConditions.Should().HaveCount(1);
 		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
-		result.WhereConditions[0].Operator.Should().Be(">");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.GreaterThan);
 		result.WhereConditions[0].Value.Value<int>().Should().Be(21);
 	}
 
@@ -76,11 +78,11 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.WhereConditions.Should().HaveCount(2);
 
 		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
-		result.WhereConditions[0].Operator.Should().Be(">");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.GreaterThan);
 		result.WhereConditions[0].Value.Value<int>().Should().Be(21);
 
 		result.WhereConditions[1].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[1].Operator.Should().Be("=");
+		result.WhereConditions[1].Operator.Should().Be(ComparisonOperator.Equals);
 		result.WhereConditions[1].Value.Value<string>().Should().Be("John");
 	}
 
@@ -99,10 +101,10 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.OrderBy.Should().HaveCount(2);
 
 		result.OrderBy[0].PropertyPath.Should().Be("c.age");
-		result.OrderBy[0].Direction.Should().Be("DESC");
+		result.OrderBy[0].Direction.Should().Be(SortDirection.Descending);
 
 		result.OrderBy[1].PropertyPath.Should().Be("c.name");
-		result.OrderBy[1].Direction.Should().Be("ASC");
+		result.OrderBy[1].Direction.Should().Be(SortDirection.Ascending);
 	}
 
 	[Fact]
@@ -134,7 +136,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.FromName.Should().Be("c");
 		result.WhereConditions.Should().HaveCount(1);
 		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[0].Operator.Should().Be("CONTAINS");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
 		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
 	}
 
@@ -152,7 +154,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.FromName.Should().Be("c");
 		result.WhereConditions.Should().HaveCount(1);
 		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[0].Operator.Should().Be("STARTSWITH");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringStartsWith);
 		result.WhereConditions[0].Value.Value<string>().Should().Be("J");
 	}
 
@@ -175,16 +177,16 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 
 		result.WhereConditions.Should().HaveCount(2);
 		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
-		result.WhereConditions[0].Operator.Should().Be(">");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.GreaterThan);
 		result.WhereConditions[0].Value.Value<int>().Should().Be(21);
 
 		result.WhereConditions[1].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[1].Operator.Should().Be("CONTAINS");
+		result.WhereConditions[1].Operator.Should().Be(ComparisonOperator.StringContains);
 		result.WhereConditions[1].Value.Value<string>().Should().Be("J");
 
 		result.OrderBy.Should().HaveCount(1);
 		result.OrderBy[0].PropertyPath.Should().Be("c.age");
-		result.OrderBy[0].Direction.Should().Be("DESC");
+		result.OrderBy[0].Direction.Should().Be(SortDirection.Descending);
 
 		result.Limit.Should().Be(10);
 	}
@@ -193,7 +195,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	public void ShouldHandleQuotedStringsInWhereConditions()
 	{
 		// Arrange
-		var parser = new CosmosDbSqlQueryParser();
+		var parser = new CosmosDbSqlQueryParser(new TestLogger(output));
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act
@@ -204,7 +206,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.WhereConditions.Should().NotBeNull();
 		result.WhereConditions.Should().HaveCount(1);
 		result.WhereConditions[0].PropertyPath.Should().Be("c.Name");
-		result.WhereConditions[0].Operator.Should().Be("=");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Equals);
 		result.WhereConditions[0].Value.Type.Should().Be(JTokenType.String);
 		result.WhereConditions[0].Value.ToString().Should().Be("Alice");
 	}
@@ -213,7 +215,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	public void ShouldHandleIntegrationTestQuery()
 	{
 		// This exact query is used in the integration test
-		var parser = new CosmosDbSqlQueryParser();
+		var parser = new CosmosDbSqlQueryParser(new TestLogger(output));
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act
@@ -236,7 +238,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 
 		var whereCondition = result.WhereConditions[0];
 		whereCondition.PropertyPath.Should().Be("c.Name");
-		whereCondition.Operator.Should().Be("=");
+		whereCondition.Operator.Should().Be(ComparisonOperator.Equals);
 		whereCondition.Value.Type.Should().Be(JTokenType.String);
 		whereCondition.Value.Value<string>().Should().Be("Alice");
 	}

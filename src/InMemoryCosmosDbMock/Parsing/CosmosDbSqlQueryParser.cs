@@ -204,7 +204,7 @@ public class CosmosDbSqlQueryParser
 			.Select(item => new OrderInfo
 			{
 				PropertyPath = item.PropertyPath,
-				Direction = item.Descending ? "DESC" : "ASC"
+				Direction = item.Descending ? SortDirection.Descending : SortDirection.Ascending
 			})
 			.ToList();
 	}
@@ -244,7 +244,7 @@ public class CosmosDbSqlQueryParser
 				conditions.Add(new WhereCondition
 				{
 					PropertyPath = leftProp.PropertyPath,
-					Operator = GetOperatorString(comparison.Operator),
+					Operator = GetComparisonOperator(comparison.Operator),
 					Value = JToken.FromObject(rightConst.Value)
 				});
 			}
@@ -255,7 +255,7 @@ public class CosmosDbSqlQueryParser
 				conditions.Add(new WhereCondition
 				{
 					PropertyPath = rightProp.PropertyPath,
-					Operator = GetOperatorString(reversedOp),
+					Operator = GetComparisonOperator(reversedOp),
 					Value = JToken.FromObject(leftConst.Value)
 				});
 			}
@@ -271,10 +271,14 @@ public class CosmosDbSqlQueryParser
 				functionCall.Arguments[0] is PropertyExpression propExpr &&
 				functionCall.Arguments[1] is ConstantExpression constExpr)
 			{
+				var op = functionName == "CONTAINS" ?
+					ComparisonOperator.StringContains :
+					ComparisonOperator.StringStartsWith;
+
 				conditions.Add(new WhereCondition
 				{
 					PropertyPath = propExpr.PropertyPath,
-					Operator = functionName,
+					Operator = op,
 					Value = JToken.FromObject(constExpr.Value)
 				});
 			}
@@ -285,7 +289,7 @@ public class CosmosDbSqlQueryParser
 			conditions.Add(new WhereCondition
 			{
 				PropertyPath = propExpr.PropertyPath,
-				Operator = "=",
+				Operator = ComparisonOperator.Equals,
 				Value = JToken.FromObject(true) // Treat as a boolean condition (property = true)
 			});
 		}
@@ -309,18 +313,18 @@ public class CosmosDbSqlQueryParser
 	}
 
 	/// <summary>
-	/// Converts a BinaryOperator enum value to its string representation.
+	/// Converts a BinaryOperator enum value to its ComparisonOperator representation.
 	/// </summary>
-	private string GetOperatorString(BinaryOperator op)
+	private ComparisonOperator GetComparisonOperator(BinaryOperator op)
 	{
 		return op switch
 		{
-			BinaryOperator.Equal => "=",
-			BinaryOperator.NotEqual => "!=",
-			BinaryOperator.GreaterThan => ">",
-			BinaryOperator.LessThan => "<",
-			BinaryOperator.GreaterThanOrEqual => ">=",
-			BinaryOperator.LessThanOrEqual => "<=",
+			BinaryOperator.Equal => ComparisonOperator.Equals,
+			BinaryOperator.NotEqual => ComparisonOperator.NotEquals,
+			BinaryOperator.GreaterThan => ComparisonOperator.GreaterThan,
+			BinaryOperator.LessThan => ComparisonOperator.LessThan,
+			BinaryOperator.GreaterThanOrEqual => ComparisonOperator.GreaterThanOrEqual,
+			BinaryOperator.LessThanOrEqual => ComparisonOperator.LessThanOrEqual,
 			_ => throw new ArgumentException($"Unsupported operator: {op}")
 		};
 	}
@@ -351,13 +355,13 @@ public class CosmosDbSqlQueryParser
 			foreach (var item in orderByClause.Split(','))
 			{
 				var trimmedItem = item.Trim();
-				var direction = "ASC";
+				var direction = SortDirection.Ascending;
 				var propertyPath = trimmedItem;
 
 				// Check for DESC/ASC
 				if (trimmedItem.EndsWith(" DESC", StringComparison.OrdinalIgnoreCase))
 				{
-					direction = "DESC";
+					direction = SortDirection.Descending;
 					propertyPath = trimmedItem.Substring(0, trimmedItem.Length - " DESC".Length).Trim();
 				}
 				else if (trimmedItem.EndsWith(" ASC", StringComparison.OrdinalIgnoreCase))
@@ -465,7 +469,7 @@ public class WhereCondition
 	/// <summary>
 	/// The operator to apply.
 	/// </summary>
-	public string Operator { get; set; }
+	public ComparisonOperator Operator { get; set; }
 
 	/// <summary>
 	/// The value to compare with.
@@ -484,7 +488,7 @@ public class OrderInfo
 	public string PropertyPath { get; set; }
 
 	/// <summary>
-	/// The direction to order in (ASC or DESC).
+	/// The direction to sort in (ASC or DESC).
 	/// </summary>
-	public string Direction { get; set; } = "ASC";
+	public SortDirection Direction { get; set; } = SortDirection.Ascending;
 }

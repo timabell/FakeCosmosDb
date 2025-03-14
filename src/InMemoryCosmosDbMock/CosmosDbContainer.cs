@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TimAbell.MockableCosmos.Parsing;
 
@@ -15,9 +16,15 @@ public class CosmosDbContainer
 	private readonly ICosmosDbIndexManager _indexManager = new CosmosDbIndexManager();
 	private readonly ICosmosDbPaginationManager _paginationManager = new CosmosDbPaginationManager();
 	private readonly CosmosDbSqlQueryParser _queryParser = new CosmosDbSqlQueryParser();
+	private readonly CosmosDbQueryExecutor _queryExecutor;
 
 	// Add a property to access the store
 	public List<JObject> Documents => _store;
+
+	public CosmosDbContainer(ILogger logger = null)
+	{
+		_queryExecutor = new CosmosDbQueryExecutor(logger);
+	}
 
 	public Task AddAsync(object entity)
 	{
@@ -31,14 +38,14 @@ public class CosmosDbContainer
 	public Task<IEnumerable<JObject>> QueryAsync(string sql)
 	{
 		var parsedQuery = _queryParser.Parse(sql);
-		var results = CosmosDbQueryExecutor.Execute(parsedQuery, _store);
+		var results = _queryExecutor.Execute(parsedQuery, _store);
 		return Task.FromResult(results);
 	}
 
 	public Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string sql, int maxItemCount, string continuationToken = null)
 	{
 		var parsedQuery = _queryParser.Parse(sql);
-		var results = CosmosDbQueryExecutor.Execute(parsedQuery, _store);
+		var results = _queryExecutor.Execute(parsedQuery, _store);
 		var (pagedResults, nextToken) = _paginationManager.GetPage(results, maxItemCount, continuationToken);
 		return Task.FromResult((pagedResults, nextToken));
 	}

@@ -1,15 +1,21 @@
 using System.Linq;
 using System.Threading.Tasks;
+using InMemoryCosmosDbMock.Tests.Utilities;
+using Microsoft.Extensions.Logging;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace TimAbell.MockableCosmos.Tests;
 
 public class CosmosDbMockTests
 {
-	private readonly CosmosInMemoryCosmosDb _db = new();
+	private readonly CosmosInMemoryCosmosDb _db;
+	private readonly ITestOutputHelper _output;
 
-	public CosmosDbMockTests()
+	public CosmosDbMockTests(ITestOutputHelper output)
 	{
+		_output = output;
+		_db = new CosmosInMemoryCosmosDb(new TestLogger(output));
 		_db.AddContainerAsync("Users").Wait();
 	}
 
