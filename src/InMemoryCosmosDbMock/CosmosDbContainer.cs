@@ -15,6 +15,9 @@ public class CosmosDbContainer
     private readonly ICosmosDbPaginationManager _paginationManager = new CosmosDbPaginationManager();
     private readonly ICosmosDbQueryParser _queryParser = new CosmosDbQueryParser();
 
+    // Add a property to access the store
+    public List<JObject> Documents => _store;
+
     public Task AddAsync(object entity)
     {
         var json = JObject.FromObject(entity);

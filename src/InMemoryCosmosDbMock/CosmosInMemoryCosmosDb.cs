@@ -1,13 +1,33 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
+using TimAbell.MockableCosmos.Parsing;
 
 namespace TimAbell.MockableCosmos;
 
 public class CosmosInMemoryCosmosDb : ICosmosDb
 {
     private readonly Dictionary<string, CosmosDbContainer> _containers = new();
+    private readonly ICosmosDbQueryParser _queryParser;
+    private readonly ILogger _logger;
+
+    public CosmosInMemoryCosmosDb()
+    {
+        _queryParser = new SpracheSqlQueryParser();
+    }
+    public CosmosInMemoryCosmosDb(ICosmosDbQueryParser queryParser)
+        : this(queryParser, null)
+    {
+    }
+
+    public CosmosInMemoryCosmosDb(ICosmosDbQueryParser queryParser, ILogger logger)
+    {
+        _queryParser = queryParser;
+        _logger = logger;
+    }
 
     public Task AddContainerAsync(string containerName)
     {
@@ -26,10 +46,39 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 
     public Task<IEnumerable<JObject>> QueryAsync(string containerName, string sql)
     {
-        if (!_containers.ContainsKey(containerName))
-            throw new InvalidOperationException($"Container '{containerName}' does not exist.");
+        _logger?.LogDebug("Executing query '{sql}' on container '{containerName}'", sql, containerName);
 
-        return _containers[containerName].QueryAsync(sql);
+        try
+        {
+            // Get the container
+            if (!_containers.TryGetValue(containerName, out var container))
+            {
+                _logger?.LogWarning("Container '{containerName}' not found", containerName);
+                throw new InvalidOperationException($"Container '{containerName}' not found");
+            }
+
+            // Parse the query
+            _logger?.LogDebug("Parsing query");
+            var parsedQuery = _queryParser.Parse(sql);
+            _logger?.LogDebug("Query parsed successfully. WhereConditions: {count}",
+                parsedQuery.WhereConditions != null ? parsedQuery.WhereConditions.Count.ToString() : "null");
+
+            // Execute the query
+            _logger?.LogDebug("Executing query against in-memory store");
+            var results = CosmosDbQueryExecutor.Execute(parsedQuery, container.Documents);
+            _logger?.LogDebug("Query execution complete. Results count: {count}", results.Count());
+
+            return Task.FromResult<IEnumerable<JObject>>(results);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error executing query: {message}", ex.Message);
+            if (ex.InnerException != null)
+            {
+                _logger?.LogError(ex, "Inner exception: {message}", ex.InnerException.Message);
+            }
+            throw;
+        }
     }
 
     public Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null)

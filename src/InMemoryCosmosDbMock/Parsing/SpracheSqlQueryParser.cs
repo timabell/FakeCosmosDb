@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace TimAbell.MockableCosmos.Parsing;
 
@@ -10,46 +11,56 @@ namespace TimAbell.MockableCosmos.Parsing;
 /// </summary>
 public class SpracheSqlQueryParser : ICosmosDbQueryParser
 {
+    private readonly ILogger _logger;
+
+    public SpracheSqlQueryParser() : this(null)
+    {
+    }
+
+    public SpracheSqlQueryParser(ILogger logger)
+    {
+        _logger = logger;
+    }
+
     /// <summary>
     /// Parses a CosmosDB SQL query using the Sprache grammar.
     /// </summary>
     public ParsedQuery Parse(string query)
     {
+        _logger?.LogDebug($"SpracheSqlQueryParser: Parsing query '{query}'");
+
         try
         {
-            // Add logging to trace through the parsing process
-            Console.WriteLine($"SpracheSqlQueryParser: Parsing query '{query}'");
-
             // First try to parse with the grammar
             var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
-            Console.WriteLine($"SpracheSqlQueryParser: Successfully parsed AST: {parsedQuery}");
+            _logger?.LogDebug($"SpracheSqlQueryParser: Successfully parsed AST: {parsedQuery}");
 
             var result = ConvertToLegacyParsedQuery(parsedQuery);
 
             // Log the extracted WHERE conditions for debugging
             if (result.WhereConditions != null)
             {
-                Console.WriteLine($"SpracheSqlQueryParser: Extracted {result.WhereConditions.Count} WHERE conditions:");
+                _logger?.LogDebug($"SpracheSqlQueryParser: Extracted {result.WhereConditions.Count} WHERE conditions:");
                 foreach (var condition in result.WhereConditions)
                 {
-                    Console.WriteLine($"  - {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
+                    _logger?.LogDebug($"  - {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
                 }
             }
             else
             {
-                Console.WriteLine("SpracheSqlQueryParser: No WHERE conditions extracted");
+                _logger?.LogDebug("SpracheSqlQueryParser: No WHERE conditions extracted");
             }
 
             // Log the legacy parsed query properties
-            Console.WriteLine($"SpracheSqlQueryParser: Legacy ParsedQuery: FromName={result.FromName}, FromAlias={result.FromAlias}");
-            Console.WriteLine($"SpracheSqlQueryParser: PropertyPaths={string.Join(", ", result.PropertyPaths)}");
-            Console.WriteLine($"SpracheSqlQueryParser: Limit={result.Limit}");
+            _logger?.LogDebug($"SpracheSqlQueryParser: Legacy ParsedQuery: FromName={result.FromName}, FromAlias={result.FromAlias}");
+            _logger?.LogDebug($"SpracheSqlQueryParser: PropertyPaths={string.Join(", ", result.PropertyPaths)}");
+            _logger?.LogDebug($"SpracheSqlQueryParser: Limit={result.Limit}");
 
             // If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
             if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
                 (query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
             {
-                Console.WriteLine("SpracheSqlQueryParser: Using fallback parser for ORDER BY and LIMIT");
+                _logger?.LogDebug("SpracheSqlQueryParser: Using fallback parser for ORDER BY and LIMIT");
                 FallbackParseOrderByAndLimit(query, result);
             }
 
@@ -57,7 +68,7 @@ public class SpracheSqlQueryParser : ICosmosDbQueryParser
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"SpracheSqlQueryParser: Error parsing query: {ex.Message}");
+            _logger?.LogError(ex, $"SpracheSqlQueryParser: Error parsing query: {ex.Message}");
             throw new FormatException($"Failed to parse CosmosDB SQL query: {ex.Message}", ex);
         }
     }
