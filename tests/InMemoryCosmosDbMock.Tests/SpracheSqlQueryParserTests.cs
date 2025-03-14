@@ -187,4 +187,24 @@ public class SpracheSqlQueryParserTests
 
         result.Limit.Should().Be(10);
     }
+
+    [Fact]
+    public void ShouldHandleQuotedStringsInWhereConditions()
+    {
+        // Arrange
+        var parser = new SpracheSqlQueryParser();
+        var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
+
+        // Act
+        var result = parser.Parse(sql);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.WhereConditions.Should().NotBeNull();
+        result.WhereConditions.Should().HaveCount(1);
+        result.WhereConditions[0].PropertyPath.Should().Be("c.Name");
+        result.WhereConditions[0].Operator.Should().Be("=");
+        result.WhereConditions[0].Value.Type.Should().Be(JTokenType.String);
+        result.WhereConditions[0].Value.ToString().Should().Be("Alice");
+    }
 }
