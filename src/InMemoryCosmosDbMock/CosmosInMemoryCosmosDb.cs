@@ -13,22 +13,25 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 	private readonly Dictionary<string, CosmosDbContainer> _containers = new();
 	private readonly CosmosDbSqlQueryParser _queryParser;
 	private readonly ILogger _logger;
+	private readonly CosmosDbQueryExecutor _queryExecutor;
 
 	public CosmosInMemoryCosmosDb()
 	{
 		_queryParser = new CosmosDbSqlQueryParser();
+		_queryExecutor = new CosmosDbQueryExecutor();
 	}
 
 	public CosmosInMemoryCosmosDb(ILogger logger)
 	{
 		_logger = logger;
 		_queryParser = new CosmosDbSqlQueryParser(_logger);
+		_queryExecutor = new CosmosDbQueryExecutor(logger);
 	}
 
 	public Task AddContainerAsync(string containerName)
 	{
 		if (!_containers.ContainsKey(containerName))
-			_containers[containerName] = new CosmosDbContainer();
+			_containers[containerName] = new CosmosDbContainer(_logger);
 		return Task.CompletedTask;
 	}
 
@@ -61,7 +64,7 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 
 			// Execute the query
 			_logger?.LogDebug("Executing query against in-memory store");
-			var results = CosmosDbQueryExecutor.Execute(parsedQuery, container.Documents);
+			var results = _queryExecutor.Execute(parsedQuery, container.Documents);
 			_logger?.LogDebug("Query execution complete. Results count: {count}", results.Count());
 
 			return Task.FromResult<IEnumerable<JObject>>(results);

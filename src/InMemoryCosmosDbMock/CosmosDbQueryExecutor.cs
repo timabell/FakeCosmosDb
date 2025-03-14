@@ -11,14 +11,14 @@ namespace TimAbell.MockableCosmos;
 
 public class CosmosDbQueryExecutor
 {
-	private static ILogger _logger;
+	private readonly ILogger _logger;
 
-	public static void SetLogger(ILogger logger)
+	public CosmosDbQueryExecutor(ILogger logger = null)
 	{
 		_logger = logger;
 	}
 
-	public static IEnumerable<JObject> Execute(ParsedQuery query, List<JObject> store)
+	public IEnumerable<JObject> Execute(ParsedQuery query, List<JObject> store)
 	{
 		if (_logger != null)
 		{
@@ -176,7 +176,7 @@ public class CosmosDbQueryExecutor
 	}
 
 	// Helper method to evaluate WHERE conditions with detailed logging
-	private static bool EvaluateWhereConditions(JObject document, List<WhereCondition> conditions)
+	private bool EvaluateWhereConditions(JObject document, List<WhereCondition> conditions)
 	{
 		if (conditions == null || conditions.Count == 0)
 		{
@@ -209,7 +209,7 @@ public class CosmosDbQueryExecutor
 		return true;
 	}
 
-	private static bool EvaluateCondition(JToken propertyValue, string operatorText, JToken conditionValue)
+	private bool EvaluateCondition(JToken propertyValue, string operatorText, JToken conditionValue)
 	{
 		// Handle null property values
 		if (propertyValue == null)
@@ -318,7 +318,7 @@ public class CosmosDbQueryExecutor
 		}
 	}
 
-	private static int CompareValues(JToken token, object value)
+	private int CompareValues(JToken token, object value)
 	{
 		if (token == null || value == null)
 		{
@@ -352,7 +352,7 @@ public class CosmosDbQueryExecutor
 		return 0;
 	}
 
-	private static IEnumerable<string> GetSelectedProperties(SelectClause selectClause)
+	private IEnumerable<string> GetSelectedProperties(SelectClause selectClause)
 	{
 		return selectClause.Items
 			.OfType<PropertySelectItem>()
@@ -360,7 +360,7 @@ public class CosmosDbQueryExecutor
 			.ToList();
 	}
 
-	private static IEnumerable<JObject> ApplyProjection(IEnumerable<JObject> results, IEnumerable<string> properties)
+	private IEnumerable<JObject> ApplyProjection(IEnumerable<JObject> results, IEnumerable<string> properties)
 	{
 		var projectedResults = new List<JObject>();
 		var propertyPaths = properties.ToList();
@@ -384,12 +384,12 @@ public class CosmosDbQueryExecutor
 		return projectedResults;
 	}
 
-	private static object GetPropertyValue(JObject item, string propertyPath)
+	private object GetPropertyValue(JObject item, string propertyPath)
 	{
 		return GetPropertyByPath(item, propertyPath)?.Value<object>();
 	}
 
-	private static JToken GetPropertyByPath(JObject item, string path)
+	private JToken GetPropertyByPath(JObject item, string path)
 	{
 		var parts = path.Split('.');
 		JToken current = item;
@@ -413,7 +413,7 @@ public class CosmosDbQueryExecutor
 		return current;
 	}
 
-	private static void SetPropertyByPath(JObject item, string path, JToken value)
+	private void SetPropertyByPath(JObject item, string path, JToken value)
 	{
 		var parts = path.Split('.');
 		var current = item;
@@ -433,12 +433,12 @@ public class CosmosDbQueryExecutor
 		current[parts[parts.Length - 1]] = value;
 	}
 
-	private static bool ApplyWhere(JObject item, Expression condition)
+	private bool ApplyWhere(JObject item, Expression condition)
 	{
 		return EvaluateExpression(item, condition);
 	}
 
-	private static bool ApplyLegacyWhereConditions(JObject item, List<WhereCondition> whereConditions)
+	private bool ApplyLegacyWhereConditions(JObject item, List<WhereCondition> whereConditions)
 	{
 		// All conditions must be true (AND semantics)
 		foreach (var condition in whereConditions)
@@ -455,7 +455,7 @@ public class CosmosDbQueryExecutor
 		return true;
 	}
 
-	private static bool CompareCondition(object propValue, string operatorStr, JToken conditionValue)
+	private bool CompareCondition(object propValue, string operatorStr, JToken conditionValue)
 	{
 		// Handle null values
 		if (propValue == null)
@@ -528,7 +528,7 @@ public class CosmosDbQueryExecutor
 		return propValue.Equals(value);
 	}
 
-	private static bool EvaluateExpression(JObject item, Expression expression)
+	private bool EvaluateExpression(JObject item, Expression expression)
 	{
 		if (expression is BinaryExpression binary)
 		{
@@ -577,7 +577,7 @@ public class CosmosDbQueryExecutor
 		throw new NotImplementedException($"Expression type {expression.GetType().Name} not implemented");
 	}
 
-	private static object EvaluateValue(JObject item, Expression expression)
+	private object EvaluateValue(JObject item, Expression expression)
 	{
 		if (expression is ConstantExpression constant)
 		{
@@ -597,7 +597,7 @@ public class CosmosDbQueryExecutor
 		throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
 	}
 
-	private static bool EvaluateFunction(JObject item, FunctionCallExpression function)
+	private bool EvaluateFunction(JObject item, FunctionCallExpression function)
 	{
 		if (string.Equals(function.Name, "CONTAINS", StringComparison.OrdinalIgnoreCase) && function.Arguments.Count == 2)
 		{
@@ -628,7 +628,7 @@ public class CosmosDbQueryExecutor
 		throw new NotImplementedException($"Function {function.Name} not implemented");
 	}
 
-	private static int CompareValues(object left, object right)
+	private int CompareValues(object left, object right)
 	{
 		if (left == null && right == null)
 		{
