@@ -89,9 +89,9 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 
 		return _containers[containerName].QueryWithPaginationAsync(sql, maxItemCount, continuationToken);
 	}
-	
+
 	public Container GetContainer(string databaseName, string containerId)
 	{
-		return _containers[databaseName];
+		return new FakeContainer();
 	}
 }
