@@ -2,15 +2,32 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Scripts;
+using Newtonsoft.Json.Linq;
+using Microsoft.Extensions.Logging;
+using TimAbell.MockableCosmos.Parsing;
 
 namespace TimAbell.MockableCosmos;
 
 public class FakeContainer : Container
 {
+	private readonly List<JObject> _store = new List<JObject>();
+	private readonly CosmosDbSqlQueryParser _queryParser;
+	private readonly CosmosDbQueryExecutor _queryExecutor;
+	private readonly ICosmosDbPaginationManager _paginationManager = new CosmosDbPaginationManager();
+
+	public FakeContainer(ILogger logger = null)
+	{
+		_queryParser = new CosmosDbSqlQueryParser(logger);
+		_queryExecutor = new CosmosDbQueryExecutor(logger);
+	}
+
+	public List<JObject> Documents => _store;
+
 	public override Task<ContainerResponse> ReadContainerAsync(ContainerRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
 		throw new NotImplementedException();
@@ -138,7 +155,25 @@ public class FakeContainer : Container
 
 	public override FeedIterator<T> GetItemQueryIterator<T>(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		throw new NotImplementedException();
+		var query = queryDefinition?.QueryText;
+		var parsedQuery = _queryParser.Parse(query);
+		var results = _queryExecutor.Execute(parsedQuery, _store);
+
+		// Apply pagination if needed
+		IEnumerable<JObject> pagedResults = results;
+		string nextToken = null;
+
+		if (requestOptions?.MaxItemCount > 0)
+		{
+			var paginationResult = _paginationManager.GetPage(results, requestOptions.MaxItemCount.Value, continuationToken);
+			pagedResults = paginationResult.Item1;
+			nextToken = paginationResult.Item2;
+		}
+
+		// Convert results to the target type
+		var convertedResults = pagedResults.Select(item => item.ToObject<T>()).ToList();
+
+		return new FakeFeedIterator<T>(convertedResults, nextToken);
 	}
 
 	public override FeedIterator GetItemQueryStreamIterator(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null)
@@ -225,4 +260,76 @@ public class FakeContainer : Container
 	public override Database Database { get; }
 	public override Conflicts Conflicts { get; }
 	public override Scripts Scripts { get; }
+
+	// Custom implementation of FeedIterator<T> for the FakeContainer
+	private class FakeFeedIterator<T> : FeedIterator<T>
+	{
+		private readonly List<T> _results;
+		private readonly string _continuationToken;
+		private bool _consumed;
+
+		public FakeFeedIterator(IEnumerable<T> results, string continuationToken)
+		{
+			_results = results.ToList();
+			_continuationToken = continuationToken;
+			_consumed = false;
+		}
+
+		public override bool HasMoreResults => !_consumed;
+
+		public override Task<FeedResponse<T>> ReadNextAsync(CancellationToken cancellationToken = default)
+		{
+			if (_consumed)
+			{
+				return Task.FromResult(CreateEmptyResponse());
+			}
+
+			_consumed = true;
+			return Task.FromResult(CreateResponse(_results, _continuationToken));
+		}
+
+		private FeedResponse<T> CreateResponse(IEnumerable<T> results, string continuationToken)
+		{
+			// Since we can't directly instantiate FeedResponse<T>, create a custom implementation
+			return new FakeFeedResponse<T>(results, continuationToken);
+		}
+
+		private FeedResponse<T> CreateEmptyResponse()
+		{
+			return new FakeFeedResponse<T>(Enumerable.Empty<T>(), null);
+		}
+	}
+
+	// Custom implementation of FeedResponse<T> for the FakeFeedIterator
+	private class FakeFeedResponse<T> : FeedResponse<T>
+	{
+		private readonly List<T> _results;
+
+		public FakeFeedResponse(IEnumerable<T> results, string continuationToken)
+		{
+			_results = results.ToList();
+			ContinuationToken = continuationToken;
+		}
+
+		public override string ContinuationToken { get; }
+
+		public override IEnumerator<T> GetEnumerator()
+		{
+			return _results.GetEnumerator();
+		}
+
+		public override int Count => _results.Count;
+		public override string IndexMetrics { get; }
+
+		public override HttpStatusCode StatusCode { get; }
+		public override double RequestCharge => 0;
+
+		public override Headers Headers => new Headers();
+		public override IEnumerable<T> Resource { get; }
+
+		// Additional FeedResponse<T> methods/properties
+		public override string ActivityId => string.Empty;
+		public override string ETag => string.Empty;
+		public override CosmosDiagnostics Diagnostics { get; }
+	}
 }
