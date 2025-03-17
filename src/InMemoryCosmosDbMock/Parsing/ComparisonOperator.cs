@@ -11,7 +11,9 @@ namespace TimAbell.MockableCosmos.Parsing
 		LessThan,
 		LessThanOrEqual,
 		StringContains,
-		StringStartsWith
+		StringStartsWith,
+		IsDefined,
+		ArrayContains
 	}
 
 	public static class ComparisonOperatorExtensions

@@ -226,6 +226,31 @@ public class BinaryExpression : Expression
 }
 
 /// <summary>
+/// Represents a unary operation in a CosmosDB SQL query.
+/// </summary>
+public class UnaryExpression : Expression
+{
+	public UnaryOperator Operator { get; }
+	public Expression Operand { get; }
+
+	public UnaryExpression(UnaryOperator op, Expression operand)
+	{
+		Operator = op;
+		Operand = operand;
+	}
+
+	public override string ToString() => $"{Operator}({Operand})";
+}
+
+/// <summary>
+/// Represents the operators available for unary expressions.
+/// </summary>
+public enum UnaryOperator
+{
+	Not
+}
+
+/// <summary>
 /// Represents the operators available for binary expressions.
 /// </summary>
 public enum BinaryOperator
