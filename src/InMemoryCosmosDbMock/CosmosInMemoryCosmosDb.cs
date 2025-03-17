@@ -102,6 +102,6 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 
 	public Database GetDatabase(string databaseName)
 	{
-		// todo
+		return new FakeDatabase(databaseName);
 	}
 }
