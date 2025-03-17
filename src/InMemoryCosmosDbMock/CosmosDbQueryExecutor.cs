@@ -1429,6 +1429,17 @@ public class CosmosDbQueryExecutor
 			return result;
 		}
 
+		if (expression is UnaryExpression unary)
+		{
+			// For unary expressions in a value context, we evaluate them as boolean
+			bool result = EvaluateExpression(item, unary);
+			if (_logger != null)
+			{
+				_logger.LogDebug("Unary expression evaluated to: {result}", result);
+			}
+			return result;
+		}
+
 		throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
 	}
 
