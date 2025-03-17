@@ -934,6 +934,7 @@ public class CosmosDbQueryExecutor
 							return string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
 						}
 					}
+
 					// Handle numeric comparisons
 					else if (leftValue is JValue leftNumJValue &&
 							 (leftNumJValue.Type == JTokenType.Integer || leftNumJValue.Type == JTokenType.Float))
@@ -1176,10 +1177,21 @@ public class CosmosDbQueryExecutor
 		{
 			if (_logger != null)
 			{
-				_logger.LogDebug("Evaluating function: {name}", func.FunctionName);
+				_logger.LogDebug("Evaluating function: {name}", func.Name);
 			}
 
 			return EvaluateFunction(item, func);
+		}
+
+		if (expression is BinaryExpression binary)
+		{
+			// For binary expressions in a value context, we evaluate them as boolean
+			bool result = EvaluateExpression(item, binary);
+			if (_logger != null)
+			{
+				_logger.LogDebug("Binary expression evaluated to: {result}", result);
+			}
+			return result;
 		}
 
 		throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
@@ -1300,6 +1312,56 @@ public class CosmosDbQueryExecutor
 						arrayValue, arrayValue.GetType().Name);
 				}
 				return false;
+
+			case "IS_NULL":
+				if (function.Arguments.Count != 1)
+				{
+					throw new ArgumentException("IS_NULL function requires exactly 1 argument");
+				}
+
+				if (function.Arguments[0] is PropertyExpression propExpr)
+				{
+					var token = GetPropertyByPath(item, propExpr.PropertyPath);
+					bool isNull = token == null || token.Type == JTokenType.Null;
+
+					if (_logger != null)
+					{
+						_logger.LogDebug("IS_NULL: Property '{path}' is {result}", propExpr.PropertyPath, isNull ? "null" : "not null");
+					}
+
+					return isNull;
+				}
+
+				var value = EvaluateValue(item, function.Arguments[0]);
+				bool result = value == null;
+
+				if (_logger != null)
+				{
+					_logger.LogDebug("IS_NULL: Value is {result}", result ? "null" : "not null");
+				}
+
+				return result;
+
+			case "IS_DEFINED":
+				if (function.Arguments.Count != 1)
+				{
+					throw new ArgumentException("IS_DEFINED function requires exactly 1 argument");
+				}
+
+				if (function.Arguments[0] is PropertyExpression propDefined)
+				{
+					var token = GetPropertyByPath(item, propDefined.PropertyPath);
+					bool isDefined = token != null;
+
+					if (_logger != null)
+					{
+						_logger.LogDebug("IS_DEFINED: Property '{path}' is {result}", propDefined.PropertyPath, isDefined ? "defined" : "not defined");
+					}
+
+					return isDefined;
+				}
+
+				throw new ArgumentException("IS_DEFINED function requires a property expression as its argument");
 
 			default:
 				throw new NotImplementedException($"Function {function.Name} not implemented");
