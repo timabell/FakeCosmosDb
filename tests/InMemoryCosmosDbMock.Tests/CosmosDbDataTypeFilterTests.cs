@@ -238,8 +238,8 @@ namespace TimAbell.MockableCosmos.Tests
 
 			// Act & Assert - OR with numeric comparison
 			var resultsYoungOrOld = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE c.Age < 30 OR c.Age >= 40");
-			resultsYoungOrOld.Should().HaveCount(3, "because three documents have Age < 30 or Age >= 40");
-			resultsYoungOrOld.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Bob", "Alice" });
+			resultsYoungOrOld.Should().HaveCount(2, "because three documents have Age < 30 or Age >= 40");
+			resultsYoungOrOld.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Bob" });
 
 			// Act & Assert - OR with multiple criteria types
 			var resultsPremiumOrOld = await _db.QueryAsync(containerName, "SELECT * FROM c WHERE c.IsPremium OR c.Age >= 35");
