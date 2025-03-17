@@ -9,7 +9,13 @@ using TimAbell.MockableCosmos.Parsing;
 
 namespace TimAbell.MockableCosmos;
 
-public class CosmosInMemoryCosmosDb : ICosmosDb
+/// <summary>
+/// Fake CosmosDb implementation that stores data in memory and allows round-trip of stored data.
+/// Can be swapped in in two ways:
+/// - Depend on the ICosmosDb interface and inject this class in place of the real CosmosDb, this is clearer but requires more changes to production code.
+/// - Use the fact that this class inherits from the real CosmosClient class and use it as a drop-in replacement for the real CosmosClient.
+/// </summary>
+public class CosmosInMemoryCosmosDb : CosmosClient, ICosmosDb
 {
 	private readonly Dictionary<string, CosmosDbContainer> _containers = new();
 	private readonly CosmosDbSqlQueryParser _queryParser;
