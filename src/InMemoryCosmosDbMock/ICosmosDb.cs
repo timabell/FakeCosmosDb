@@ -12,6 +12,6 @@ public interface ICosmosDb
 	Task<IEnumerable<JObject>> QueryAsync(string containerName, string sql);
 	Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null);
 	Container GetContainer(string databaseName, string containerId);
-	Task CreateDatabaseIfNotExistsAsync(string databaseName);
+	Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName);
 	Database GetDatabase(string databaseName);
 }

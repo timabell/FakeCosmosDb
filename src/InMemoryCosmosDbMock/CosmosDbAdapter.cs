@@ -105,9 +105,9 @@ public class CosmosDbAdapter : ICosmosDb
 		return _cosmosClient.GetContainer(databaseName, containerId);
 	}
 
-	public async Task CreateDatabaseIfNotExistsAsync(string databaseName)
+	public async Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName)
 	{
-		await _cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
+		return await _cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
 	}
 
 	public Database GetDatabase(string databaseName)

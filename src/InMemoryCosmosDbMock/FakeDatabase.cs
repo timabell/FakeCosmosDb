@@ -88,7 +88,7 @@ public class FakeDatabase : Database
 
 	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new System.NotImplementedException();
+		return Task.FromResult<ContainerResponse>(new FakeContainerResponse());
 	}
 
 	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(string id, string partitionKeyPath, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
@@ -165,4 +165,8 @@ public class FakeDatabase : Database
 	{
 		throw new System.NotImplementedException();
 	}
+}
+
+public class FakeContainerResponse : ContainerResponse
+{
 }

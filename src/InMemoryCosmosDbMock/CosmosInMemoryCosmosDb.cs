@@ -95,13 +95,22 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 		return new FakeContainer();
 	}
 
-	public Task CreateDatabaseIfNotExistsAsync(string databaseName)
+	public Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName)
 	{
-		return Task.CompletedTask;
+		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(databaseName));
 	}
 
 	public Database GetDatabase(string databaseName)
 	{
 		return new FakeDatabase(databaseName);
 	}
+}
+
+public class FakeDatabaseResponse : DatabaseResponse
+{
+	public FakeDatabaseResponse(string databaseName)
+	{
+		Database = new FakeDatabase(databaseName);
+	}
+	public override Database Database { get; }
 }
