@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
@@ -28,6 +29,16 @@ public class CosmosDbAdapter : ICosmosDb
 		_cosmosClient = clientOptions != null
 			? new CosmosClient(connectionString, clientOptions)
 			: new CosmosClient(connectionString);
+	}
+
+	public CosmosDbAdapter(string cosmosOptionsAccountEndpoint, string cosmosOptionsAccountKey, CosmosClientOptions clientOptions)
+	{
+		_cosmosClient = new CosmosClient(cosmosOptionsAccountEndpoint, cosmosOptionsAccountKey, clientOptions);
+	}
+
+	public CosmosDbAdapter(string cosmosOptionsAccountEndpoint, DefaultAzureCredential cosmosOptionsAccountKey, CosmosClientOptions clientOptions)
+	{
+		_cosmosClient = new CosmosClient(cosmosOptionsAccountEndpoint, cosmosOptionsAccountKey, clientOptions);
 	}
 
 	public async Task AddContainerAsync(string containerName)
@@ -87,5 +98,20 @@ public class CosmosDbAdapter : ICosmosDb
 			response.Count, response.ContinuationToken ?? "null");
 
 		return (response, response.ContinuationToken);
+	}
+
+	public Container GetContainer(string databaseName, string containerId)
+	{
+		return _cosmosClient.GetContainer(databaseName, containerId);
+	}
+
+	public async Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName)
+	{
+		return await _cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
+	}
+
+	public Database GetDatabase(string databaseName)
+	{
+		return _cosmosClient.GetDatabase(databaseName);
 	}
 }

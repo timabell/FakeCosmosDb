@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TimAbell.MockableCosmos.Parsing;
@@ -88,4 +89,28 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 
 		return _containers[containerName].QueryWithPaginationAsync(sql, maxItemCount, continuationToken);
 	}
+
+	public Container GetContainer(string databaseName, string containerId)
+	{
+		return new FakeContainer();
+	}
+
+	public Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName)
+	{
+		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(databaseName));
+	}
+
+	public Database GetDatabase(string databaseName)
+	{
+		return new FakeDatabase(databaseName);
+	}
+}
+
+public class FakeDatabaseResponse : DatabaseResponse
+{
+	public FakeDatabaseResponse(string databaseName)
+	{
+		Database = new FakeDatabase(databaseName);
+	}
+	public override Database Database { get; }
 }
