@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TimAbell.MockableCosmos.Parsing;
@@ -87,5 +88,10 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 			throw new InvalidOperationException($"Container '{containerName}' does not exist.");
 
 		return _containers[containerName].QueryWithPaginationAsync(sql, maxItemCount, continuationToken);
+	}
+	
+	public Container GetContainer(string databaseName, string containerId)
+	{
+		return _containers[databaseName];
 	}
 }
