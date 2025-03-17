@@ -255,25 +255,25 @@ namespace TimAbell.MockableCosmos.Tests
 			await SeedTestDataForLogicalOperators(containerName);
 
 			// Act & Assert - AND with OR
-			var resultsEngineeringAndSeniorOrPremium = await _db.QueryAsync(containerName, 
+			var resultsEngineeringAndSeniorOrPremium = await _db.QueryAsync(containerName,
 				"SELECT * FROM c WHERE c.Department = 'Engineering' AND (ARRAY_CONTAINS(c.Tags, 'senior') OR c.IsPremium)");
 			resultsEngineeringAndSeniorOrPremium.Should().HaveCount(2, "because two Engineering documents are either senior or premium");
 			resultsEngineeringAndSeniorOrPremium.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "John", "Bob" });
 
 			// Act & Assert - NOT with AND
-			var resultsNotPremiumAndEngineering = await _db.QueryAsync(containerName, 
+			var resultsNotPremiumAndEngineering = await _db.QueryAsync(containerName,
 				"SELECT * FROM c WHERE NOT c.IsPremium AND c.Department = 'Engineering'");
 			resultsNotPremiumAndEngineering.Should().HaveCount(1, "because one document is Engineering but not Premium");
 			resultsNotPremiumAndEngineering.First()["Name"].Value<string>().Should().Be("Bob");
 
 			// Act & Assert - Complex expression with multiple ANDs and ORs
-			var resultsComplex = await _db.QueryAsync(containerName, 
+			var resultsComplex = await _db.QueryAsync(containerName,
 				"SELECT * FROM c WHERE (c.Age > 30 AND c.Department = 'Engineering') OR (c.Age < 30 AND c.IsPremium)");
 			resultsComplex.Should().HaveCount(2, "because two documents match this complex condition");
 			resultsComplex.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Bob" });
 
 			// Act & Assert - Complex with NOT and parentheses
-			var resultsWithNotAndParentheses = await _db.QueryAsync(containerName, 
+			var resultsWithNotAndParentheses = await _db.QueryAsync(containerName,
 				"SELECT * FROM c WHERE NOT (c.Department = 'Engineering' OR c.Age <= 30)");
 			resultsWithNotAndParentheses.Should().HaveCount(1, "because only one document is neither Engineering nor Age <= 30");
 			resultsWithNotAndParentheses.First()["Name"].Value<string>().Should().Be("Alice");

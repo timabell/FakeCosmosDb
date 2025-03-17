@@ -283,7 +283,7 @@ public class CosmosDbSqlQueryParser
 					Value = JToken.FromObject(constExpr.Value)
 				});
 			}
-			else if (functionName == "IS_NULL" && 
+			else if (functionName == "IS_NULL" &&
 					functionCall.Arguments.Count == 1 &&
 					functionCall.Arguments[0] is PropertyExpression propNullExpr)
 			{

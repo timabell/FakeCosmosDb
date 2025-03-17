@@ -311,14 +311,14 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.Should().NotBeNull();
 		result.WhereConditions.Should().NotBeNull();
 		result.WhereConditions.Should().HaveCount(3);
-		
+
 		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
 		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.IsDefined);
-		
+
 		result.WhereConditions[1].PropertyPath.Should().Be("c.tags");
 		result.WhereConditions[1].Operator.Should().Be(ComparisonOperator.ArrayContains);
 		result.WhereConditions[1].Value.Value<string>().Should().Be("important");
-		
+
 		result.WhereConditions[2].PropertyPath.Should().Be("c.deletedAt");
 		result.WhereConditions[2].Operator.Should().Be(ComparisonOperator.Equals);
 		result.WhereConditions[2].Value.Type.Should().Be(JTokenType.Null);
@@ -340,7 +340,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.WhereExpression.Should().BeOfType<UnaryExpression>();
 		var unaryExpr = (UnaryExpression)result.WhereExpression;
 		unaryExpr.Operator.Should().Be(UnaryOperator.Not);
-		
+
 		// The inner expression should be a binary expression comparing name to 'Alice'
 		unaryExpr.Operand.Should().BeOfType<BinaryExpression>();
 		var binaryExpr = (BinaryExpression)unaryExpr.Operand;
@@ -365,10 +365,10 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.Should().NotBeNull();
 		result.WhereExpression.Should().NotBeNull();
 		result.WhereExpression.Should().BeOfType<BinaryExpression>();
-		
+
 		var orExpr = (BinaryExpression)result.WhereExpression;
 		orExpr.Operator.Should().Be(BinaryOperator.Or);
-		
+
 		// Left side should be c.name = 'Alice'
 		orExpr.Left.Should().BeOfType<BinaryExpression>();
 		var leftExpr = (BinaryExpression)orExpr.Left;
@@ -377,7 +377,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		((PropertyExpression)leftExpr.Left).PropertyPath.Should().Be("c.name");
 		leftExpr.Right.Should().BeOfType<ConstantExpression>();
 		((ConstantExpression)leftExpr.Right).Value.Should().Be("Alice");
-		
+
 		// Right side should be c.name = 'Bob'
 		orExpr.Right.Should().BeOfType<BinaryExpression>();
 		var rightExpr = (BinaryExpression)orExpr.Right;
@@ -402,23 +402,23 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.Should().NotBeNull();
 		result.WhereExpression.Should().NotBeNull();
 		result.WhereExpression.Should().BeOfType<BinaryExpression>();
-		
+
 		// Top level should be an OR expression
 		var orExpr = (BinaryExpression)result.WhereExpression;
 		orExpr.Operator.Should().Be(BinaryOperator.Or);
-		
+
 		// Left of OR should be (c.age > 20 AND c.name = 'Alice')
 		orExpr.Left.Should().BeOfType<BinaryExpression>();
 		var leftAndExpr = (BinaryExpression)orExpr.Left;
 		leftAndExpr.Operator.Should().Be(BinaryOperator.And);
-		
+
 		// Left AND's first part (c.age > 20)
 		leftAndExpr.Left.Should().BeOfType<BinaryExpression>();
 		var ageExpr = (BinaryExpression)leftAndExpr.Left;
 		ageExpr.Operator.Should().Be(BinaryOperator.GreaterThan);
 		ageExpr.Left.Should().BeOfType<PropertyExpression>();
 		((PropertyExpression)ageExpr.Left).PropertyPath.Should().Be("c.age");
-		
+
 		// Left AND's second part (c.name = 'Alice')
 		leftAndExpr.Right.Should().BeOfType<BinaryExpression>();
 		var nameExpr = (BinaryExpression)leftAndExpr.Right;
@@ -427,19 +427,19 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		((PropertyExpression)nameExpr.Left).PropertyPath.Should().Be("c.name");
 		nameExpr.Right.Should().BeOfType<ConstantExpression>();
 		((ConstantExpression)nameExpr.Right).Value.Should().Be("Alice");
-		
+
 		// Right of OR should be (c.age < 18 AND NOT IS_NULL(c.guardian))
 		orExpr.Right.Should().BeOfType<BinaryExpression>();
 		var rightAndExpr = (BinaryExpression)orExpr.Right;
 		rightAndExpr.Operator.Should().Be(BinaryOperator.And);
-		
+
 		// Right AND's first part (c.age < 18)
 		rightAndExpr.Left.Should().BeOfType<BinaryExpression>();
 		var ageExpr2 = (BinaryExpression)rightAndExpr.Left;
 		ageExpr2.Operator.Should().Be(BinaryOperator.LessThan);
 		ageExpr2.Left.Should().BeOfType<PropertyExpression>();
 		((PropertyExpression)ageExpr2.Left).PropertyPath.Should().Be("c.age");
-		
+
 		// Right AND's second part (NOT IS_NULL(c.guardian))
 		rightAndExpr.Right.Should().BeOfType<UnaryExpression>();
 		var notExpr = (UnaryExpression)rightAndExpr.Right;

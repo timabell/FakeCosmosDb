@@ -235,44 +235,32 @@ public class CosmosDbQueryExecutor
 		object conditionObj = null;
 		if (conditionValue != null)
 		{
-			try
+			// Extract primitive value from JToken
+			switch (conditionValue.Type)
 			{
-				// Extract primitive value from JToken
-				switch (conditionValue.Type)
-				{
-					case JTokenType.String:
-						conditionObj = conditionValue.Value<string>();
-						break;
-					case JTokenType.Integer:
-						conditionObj = conditionValue.Value<int>();
-						break;
-					case JTokenType.Float:
-						conditionObj = conditionValue.Value<double>();
-						break;
-					case JTokenType.Boolean:
-						conditionObj = conditionValue.Value<bool>();
-						break;
-					default:
-						conditionObj = conditionValue.ToString();
-						break;
-				}
-
-				if (_logger != null)
-				{
-					_logger.LogDebug("Extracted condition value: {value} (Type: {type})",
-						conditionObj, conditionObj?.GetType().Name ?? "null");
-					_logger.LogDebug("Property value for comparison: {value} (Type: {type})",
-						propertyValue.ToString(), propertyValue.Type.ToString());
-				}
+				case JTokenType.String:
+					conditionObj = conditionValue.Value<string>();
+					break;
+				case JTokenType.Integer:
+					conditionObj = conditionValue.Value<int>();
+					break;
+				case JTokenType.Float:
+					conditionObj = conditionValue.Value<double>();
+					break;
+				case JTokenType.Boolean:
+					conditionObj = conditionValue.Value<bool>();
+					break;
+				default:
+					conditionObj = conditionValue.ToString();
+					break;
 			}
-			catch (Exception ex)
-			{
-				if (_logger != null)
-				{
-					_logger.LogError(ex, "Error extracting condition value: {message}", ex.Message);
-				}
 
-				return false;
+			if (_logger != null)
+			{
+				_logger.LogDebug("Extracted condition value: {value} (Type: {type})",
+					conditionObj, conditionObj?.GetType().Name ?? "null");
+				_logger.LogDebug("Property value for comparison: {value} (Type: {type})",
+					propertyValue.ToString(), propertyValue.Type.ToString());
 			}
 		}
 
@@ -348,16 +336,16 @@ public class CosmosDbQueryExecutor
 				{
 					// Extract the value to search for
 					object searchValue = conditionObj;
-					
+
 					// If the search value is null, we can't meaningfully search for it
 					if (searchValue == null)
 					{
 						return false;
 					}
-					
+
 					// Convert the search value to string for comparison
 					string searchString = searchValue.ToString();
-					
+
 					// Check each element in the array
 					foreach (var element in array)
 					{
@@ -366,10 +354,10 @@ public class CosmosDbQueryExecutor
 							return true;
 						}
 					}
-					
+
 					return false;
 				}
-				
+
 				// If propValue is not an array, return false
 				return false;
 
@@ -456,13 +444,15 @@ public class CosmosDbQueryExecutor
 	private object GetPropertyValue(JObject item, string propertyPath)
 	{
 		var token = GetPropertyByPath(item, propertyPath);
+		object value = token?.Value<object>();
+
 		if (_logger != null)
 		{
-			_logger.LogDebug("GetPropertyValue for path '{path}' returned: {value}",
-				propertyPath, token?.ToString() ?? "null");
+			_logger.LogDebug("GetPropertyValue for path '{path}' returned: {value} (Type: {type})",
+				propertyPath, value?.ToString() ?? "null", value?.GetType().Name ?? "null");
 		}
 
-		return token?.Value<object>();
+		return value;
 	}
 
 	private JToken GetPropertyByPath(JObject item, string path)
@@ -537,7 +527,32 @@ public class CosmosDbQueryExecutor
 
 	private bool ApplyWhere(JObject item, Expression condition)
 	{
-		return EvaluateExpression(item, condition);
+		if (condition == null) return true;
+
+		var result = EvaluateExpression(item, condition);
+
+		// Convert the result to a boolean if it's not already
+		bool boolResult;
+		if (result is bool b)
+		{
+			boolResult = b;
+		}
+		else if (result != null)
+		{
+			boolResult = Convert.ToBoolean(result);
+		}
+		else
+		{
+			// Null evaluates to false
+			boolResult = false;
+		}
+
+		if (_logger != null)
+		{
+			_logger.LogDebug("ApplyWhere result: {result} for item with id: {id}", boolResult, item["id"]);
+		}
+
+		return boolResult;
 	}
 
 	private bool ApplyLegacyWhereConditions(JObject item, List<WhereCondition> whereConditions)
@@ -567,16 +582,16 @@ public class CosmosDbQueryExecutor
 			{
 				return true;
 			}
-			
+
 			// For IsDefined operator, propValue being null means the property is not defined
 			if (operatorEnum == ComparisonOperator.IsDefined)
 			{
 				return false;
 			}
-			
+
 			return false;
 		}
-		
+
 		// For IsDefined operator, if we get here, the property exists
 		if (operatorEnum == ComparisonOperator.IsDefined)
 		{
@@ -590,16 +605,16 @@ public class CosmosDbQueryExecutor
 			{
 				// Extract the value to search for
 				object searchValue = conditionValue.ToObject<object>();
-				
+
 				// If the search value is null, we can't meaningfully search for it
 				if (searchValue == null)
 				{
 					return false;
 				}
-				
+
 				// Convert the search value to string for comparison
 				string searchString = searchValue.ToString();
-				
+
 				// Check each element in the array
 				foreach (var element in array)
 				{
@@ -608,10 +623,10 @@ public class CosmosDbQueryExecutor
 						return true;
 					}
 				}
-				
+
 				return false;
 			}
-			
+
 			// If propValue is not an array, return false
 			return false;
 		}
@@ -642,49 +657,41 @@ public class CosmosDbQueryExecutor
 		// For numeric comparisons
 		if (propValue is IComparable comparable && value != null)
 		{
-			try
+			// Convert value to the same type as propValue if possible
+			if (propValue is int)
 			{
-				// Convert value to the same type as propValue if possible
-				if (propValue is int)
-				{
-					value = Convert.ToInt32(value);
-				}
-				else if (propValue is double)
-				{
-					value = Convert.ToDouble(value);
-				}
-				else if (propValue is decimal)
-				{
-					value = Convert.ToDecimal(value);
-				}
-				else if (propValue is long)
-				{
-					value = Convert.ToInt64(value);
-				}
-
-				int comparison = comparable.CompareTo(value);
-				switch (operatorEnum)
-				{
-					case ComparisonOperator.Equals:
-						return comparison == 0;
-					case ComparisonOperator.NotEquals:
-						return comparison != 0;
-					case ComparisonOperator.GreaterThan:
-						return comparison > 0;
-					case ComparisonOperator.GreaterThanOrEqual:
-						return comparison >= 0;
-					case ComparisonOperator.LessThan:
-						return comparison < 0;
-					case ComparisonOperator.LessThanOrEqual:
-						return comparison <= 0;
-					default:
-						throw new NotImplementedException($"Operator {operatorEnum} not implemented for numeric comparison");
-				}
+				value = Convert.ToInt32(value);
 			}
-			catch (Exception)
+			else if (propValue is double)
 			{
-				// Type conversion failed, return false
-				return false;
+				value = Convert.ToDouble(value);
+			}
+			else if (propValue is decimal)
+			{
+				value = Convert.ToDecimal(value);
+			}
+			else if (propValue is long)
+			{
+				value = Convert.ToInt64(value);
+			}
+
+			int comparison = comparable.CompareTo(value);
+			switch (operatorEnum)
+			{
+				case ComparisonOperator.Equals:
+					return comparison == 0;
+				case ComparisonOperator.NotEquals:
+					return comparison != 0;
+				case ComparisonOperator.GreaterThan:
+					return comparison > 0;
+				case ComparisonOperator.GreaterThanOrEqual:
+					return comparison >= 0;
+				case ComparisonOperator.LessThan:
+					return comparison < 0;
+				case ComparisonOperator.LessThanOrEqual:
+					return comparison <= 0;
+				default:
+					throw new NotImplementedException($"Operator {operatorEnum} not implemented for numeric comparison");
 			}
 		}
 
@@ -703,6 +710,188 @@ public class CosmosDbQueryExecutor
 		}
 
 		return false;
+	}
+
+	private bool CompareCondition(JToken propertyValue, JToken conditionValue, ComparisonOperator operatorEnum)
+	{
+		// Extract primitive values for comparison
+		object propValue = propertyValue?.Value<object>();
+		object conditionObj = null;
+		if (conditionValue != null)
+		{
+			// Extract primitive value from JToken
+			switch (conditionValue.Type)
+			{
+				case JTokenType.String:
+					conditionObj = conditionValue.Value<string>();
+					break;
+				case JTokenType.Integer:
+					conditionObj = conditionValue.Value<int>();
+					break;
+				case JTokenType.Float:
+					conditionObj = conditionValue.Value<double>();
+					break;
+				case JTokenType.Boolean:
+					conditionObj = conditionValue.Value<bool>();
+					break;
+				default:
+					conditionObj = conditionValue.ToString();
+					break;
+			}
+
+			if (_logger != null)
+			{
+				_logger.LogDebug("Extracted condition value: {value} (Type: {type})",
+					conditionObj, conditionObj?.GetType().Name ?? "null");
+				_logger.LogDebug("Property value for comparison: {value} (Type: {type})",
+					propertyValue.ToString(), propertyValue.Type.ToString());
+			}
+		}
+
+		return CompareValues(propValue, conditionObj, operatorEnum);
+	}
+
+	private bool CompareValues(object propValue, object value, ComparisonOperator operatorEnum)
+	{
+		if (_logger != null)
+		{
+			_logger.LogDebug("Comparing values: '{left}' ({leftType}) {op} '{right}' ({rightType})",
+				propValue?.ToString() ?? "null",
+				propValue?.GetType().Name ?? "null",
+				operatorEnum.ToString(),
+				value?.ToString() ?? "null",
+				value?.GetType().Name ?? "null");
+		}
+
+		// For null values
+		if (propValue == null)
+		{
+			if (operatorEnum == ComparisonOperator.Equals)
+			{
+				return value == null;
+			}
+			else if (operatorEnum == ComparisonOperator.NotEquals)
+			{
+				return value != null;
+			}
+
+			// All other comparisons with null return false
+			return false;
+		}
+
+		if (value == null)
+		{
+			if (operatorEnum == ComparisonOperator.NotEquals)
+			{
+				return true;
+			}
+
+			// All other comparisons with null return false
+			return false;
+		}
+
+		// For string values
+		if (propValue is string strPropValue && value is string strValue)
+		{
+			int comparison = string.Compare(strPropValue, strValue, StringComparison.OrdinalIgnoreCase);
+			switch (operatorEnum)
+			{
+				case ComparisonOperator.Equals:
+					return comparison == 0;
+				case ComparisonOperator.NotEquals:
+					return comparison != 0;
+				case ComparisonOperator.GreaterThan:
+					return comparison > 0;
+				case ComparisonOperator.GreaterThanOrEqual:
+					return comparison >= 0;
+				case ComparisonOperator.LessThan:
+					return comparison < 0;
+				case ComparisonOperator.LessThanOrEqual:
+					return comparison <= 0;
+				default:
+					throw new NotImplementedException($"Operator {operatorEnum} not implemented for string comparison");
+			}
+		}
+
+		// For numeric comparisons
+		if (propValue is IComparable comparable && value != null)
+		{
+			// Convert value to the same type as propValue if possible
+			if (propValue is int)
+			{
+				value = Convert.ToInt32(value);
+			}
+			else if (propValue is double)
+			{
+				value = Convert.ToDouble(value);
+			}
+			else if (propValue is decimal)
+			{
+				value = Convert.ToDecimal(value);
+			}
+			else if (propValue is long)
+			{
+				value = Convert.ToInt64(value);
+			}
+
+			int comparison = comparable.CompareTo(value);
+			switch (operatorEnum)
+			{
+				case ComparisonOperator.Equals:
+					return comparison == 0;
+				case ComparisonOperator.NotEquals:
+					return comparison != 0;
+				case ComparisonOperator.GreaterThan:
+					return comparison > 0;
+				case ComparisonOperator.GreaterThanOrEqual:
+					return comparison >= 0;
+				case ComparisonOperator.LessThan:
+					return comparison < 0;
+				case ComparisonOperator.LessThanOrEqual:
+					return comparison <= 0;
+				default:
+					throw new NotImplementedException($"Operator {operatorEnum} not implemented for numeric comparison");
+			}
+		}
+
+		// For boolean values
+		if (propValue is bool boolPropValue && value is bool boolValue)
+		{
+			switch (operatorEnum)
+			{
+				case ComparisonOperator.Equals:
+					return boolPropValue == boolValue;
+				case ComparisonOperator.NotEquals:
+					return boolPropValue != boolValue;
+				default:
+					throw new NotImplementedException($"Operator {operatorEnum} not implemented for boolean comparison");
+			}
+		}
+
+		// Default case: convert to string and compare
+		return CompareStringValues(propValue.ToString(), value.ToString(), operatorEnum);
+	}
+
+	private bool CompareStringValues(string left, string right, ComparisonOperator operatorEnum)
+	{
+		int comparison = string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+		switch (operatorEnum)
+		{
+			case ComparisonOperator.Equals:
+				return comparison == 0;
+			case ComparisonOperator.NotEquals:
+				return comparison != 0;
+			case ComparisonOperator.GreaterThan:
+				return comparison > 0;
+			case ComparisonOperator.GreaterThanOrEqual:
+				return comparison >= 0;
+			case ComparisonOperator.LessThan:
+				return comparison < 0;
+			case ComparisonOperator.LessThanOrEqual:
+				return comparison <= 0;
+			default:
+				throw new NotImplementedException($"Operator {operatorEnum} not implemented for string comparison");
+		}
 	}
 
 	private bool EvaluateExpression(JObject item, Expression expression)
@@ -889,6 +1078,15 @@ public class CosmosDbQueryExecutor
 		{
 			// For boolean property expressions, simply check if the property exists and is true
 			var value = GetPropertyValue(item, prop.PropertyPath);
+			if (value is JValue jValue)
+			{
+				value = jValue.Value;
+				if (_logger != null)
+				{
+					_logger.LogDebug("Converted JValue to underlying value: {value} (Type: {type})",
+						value?.ToString() ?? "null", value?.GetType().Name ?? "null");
+				}
+			}
 			if (value is bool boolValue)
 			{
 				return boolValue;
@@ -900,6 +1098,37 @@ public class CosmosDbQueryExecutor
 		if (expression is FunctionCallExpression func)
 		{
 			return EvaluateFunction(item, func);
+		}
+		else if (expression is UnaryExpression unary)
+		{
+			if (_logger != null)
+			{
+				_logger.LogDebug("Evaluating unary expression: {op}", unary.Operator);
+			}
+
+			object operandValue = EvaluateExpression(item, unary.Operand);
+
+			switch (unary.Operator)
+			{
+				case UnaryOperator.Not:
+					// Only handle boolean values directly
+					if (operandValue is bool boolVal)
+					{
+						bool result = !boolVal;
+						if (_logger != null)
+						{
+							_logger.LogDebug("NOT operator on boolean value {value} returned {result}", boolVal, result);
+							_logger.LogDebug("NOT operator: operand value {value} is of type {type}", operandValue, operandValue?.GetType().Name);
+						}
+						return result;
+					}
+
+					// If it's not a boolean, throw an exception for clarity
+					throw new InvalidOperationException($"NOT operator can only be applied to boolean values, but got {operandValue?.GetType().Name ?? "null"}");
+
+				default:
+					throw new NotImplementedException($"Unary operator {unary.Operator} not implemented");
+			}
 		}
 
 		throw new NotImplementedException($"Expression type {expression.GetType().Name} not implemented");
@@ -925,6 +1154,15 @@ public class CosmosDbQueryExecutor
 		if (expression is PropertyExpression prop)
 		{
 			var propValue = GetPropertyValue(item, prop.PropertyPath);
+			if (propValue is JValue jValue)
+			{
+				propValue = jValue.Value;
+				if (_logger != null)
+				{
+					_logger.LogDebug("Converted JValue to underlying value: {value} (Type: {type})",
+						propValue?.ToString() ?? "null", propValue?.GetType().Name ?? "null");
+				}
+			}
 			if (_logger != null)
 			{
 				_logger.LogDebug("Property '{path}' value: '{value}' (Type: {type})",
@@ -949,33 +1187,123 @@ public class CosmosDbQueryExecutor
 
 	private bool EvaluateFunction(JObject item, FunctionCallExpression function)
 	{
-		if (string.Equals(function.Name, "CONTAINS", StringComparison.OrdinalIgnoreCase) && function.Arguments.Count == 2)
+		if (_logger != null)
 		{
-			var propertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
-			var searchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
-
-			if (propertyValue == null || searchValue == null)
-			{
-				return false;
-			}
-
-			return propertyValue.Contains(searchValue);
+			_logger.LogDebug("Evaluating function: {name} with {count} arguments", function.Name, function.Arguments.Count);
 		}
 
-		if (string.Equals(function.Name, "STARTSWITH", StringComparison.OrdinalIgnoreCase) && function.Arguments.Count == 2)
+		switch (function.Name.ToUpperInvariant())
 		{
-			var propertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
-			var searchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+			case "CONTAINS":
+				if (function.Arguments.Count != 2)
+				{
+					throw new ArgumentException("CONTAINS function requires exactly 2 arguments");
+				}
 
-			if (propertyValue == null || searchValue == null)
-			{
+				var containsPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
+				var containsSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+
+				if (containsPropertyValue == null || containsSearchValue == null)
+				{
+					return false;
+				}
+
+				return containsPropertyValue.Contains(containsSearchValue);
+
+			case "STARTSWITH":
+				if (function.Arguments.Count != 2)
+				{
+					throw new ArgumentException("STARTSWITH function requires exactly 2 arguments");
+				}
+
+				var startsWithPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
+				var startsWithSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+
+				if (startsWithPropertyValue == null || startsWithSearchValue == null)
+				{
+					return false;
+				}
+
+				return startsWithPropertyValue.StartsWith(startsWithSearchValue);
+
+			case "ARRAY_CONTAINS":
+				if (function.Arguments.Count != 2)
+				{
+					throw new ArgumentException("ARRAY_CONTAINS function requires exactly 2 arguments");
+				}
+
+				var arrayValue = EvaluateValue(item, function.Arguments[0]);
+				var searchValue = EvaluateValue(item, function.Arguments[1]);
+
+				if (arrayValue == null || searchValue == null)
+				{
+					return false;
+				}
+
+				if (_logger != null)
+				{
+					_logger.LogDebug("ARRAY_CONTAINS: Checking if array {array} contains value {value}",
+						arrayValue, searchValue);
+				}
+
+				// Handle JArray type
+				if (arrayValue is JArray jArray)
+				{
+					// Convert search value to string for comparison if it's not null
+					var searchValueString = searchValue?.ToString();
+
+					foreach (var element in jArray)
+					{
+						if (element.ToString().Equals(searchValueString, StringComparison.OrdinalIgnoreCase))
+						{
+							if (_logger != null)
+							{
+								_logger.LogDebug("ARRAY_CONTAINS: Found match for {value} in array", searchValue);
+							}
+							return true;
+						}
+					}
+
+					if (_logger != null)
+					{
+						_logger.LogDebug("ARRAY_CONTAINS: No match found for {value} in array", searchValue);
+					}
+					return false;
+				}
+
+				// Handle regular array types
+				if (arrayValue is Array array)
+				{
+					foreach (var element in array)
+					{
+						if (element.Equals(searchValue))
+						{
+							if (_logger != null)
+							{
+								_logger.LogDebug("ARRAY_CONTAINS: Found match for {value} in array", searchValue);
+							}
+							return true;
+						}
+					}
+
+					if (_logger != null)
+					{
+						_logger.LogDebug("ARRAY_CONTAINS: No match found for {value} in array", searchValue);
+					}
+					return false;
+				}
+
+				// If it's neither a JArray nor a regular array, return false
+				if (_logger != null)
+				{
+					_logger.LogDebug("ARRAY_CONTAINS: Value is not an array: {value} (Type: {type})",
+						arrayValue, arrayValue.GetType().Name);
+				}
 				return false;
-			}
 
-			return propertyValue.StartsWith(searchValue);
+			default:
+				throw new NotImplementedException($"Function {function.Name} not implemented");
 		}
-
-		throw new NotImplementedException($"Function {function.Name} not implemented");
 	}
 
 	private int CompareValues(object left, object right)
@@ -997,34 +1325,26 @@ public class CosmosDbQueryExecutor
 
 		if (left is IComparable comparable)
 		{
-			try
+			// Convert value to the same type as propValue if possible
+			if (left is int)
 			{
-				// Convert value to the same type as propValue if possible
-				if (left is int)
-				{
-					right = Convert.ToInt32(right);
-				}
-				else if (left is double)
-				{
-					right = Convert.ToDouble(right);
-				}
-				else if (left is decimal)
-				{
-					right = Convert.ToDecimal(right);
-				}
-				else if (left is long)
-				{
-					right = Convert.ToInt64(right);
-				}
+				right = Convert.ToInt32(right);
+			}
+			else if (left is double)
+			{
+				right = Convert.ToDouble(right);
+			}
+			else if (left is decimal)
+			{
+				right = Convert.ToDecimal(right);
+			}
+			else if (left is long)
+			{
+				right = Convert.ToInt64(right);
+			}
 
-				int comparison = comparable.CompareTo(right);
-				return comparison;
-			}
-			catch
-			{
-				// Fall back to string comparison if direct comparison fails
-				return comparable.ToString().CompareTo(right.ToString());
-			}
+			int comparison = comparable.CompareTo(right);
+			return comparison;
 		}
 
 		// Default to string comparison
