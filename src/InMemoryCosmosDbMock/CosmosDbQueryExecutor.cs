@@ -395,6 +395,89 @@ public class CosmosDbQueryExecutor
 		return 0;
 	}
 
+	private int CompareValues(object left, object right)
+	{
+		if (left == null && right == null)
+		{
+			return 0;
+		}
+
+		if (left == null)
+		{
+			return -1;
+		}
+
+		if (right == null)
+		{
+			return 1;
+		}
+
+		// Handle JValue objects
+		if (left is JValue leftJValue)
+		{
+			left = leftJValue.Value;
+		}
+
+		if (right is JValue rightJValue)
+		{
+			right = rightJValue.Value;
+		}
+
+		// Handle numeric comparisons
+		if (IsNumeric(left) && IsNumeric(right))
+		{
+			// Convert both to double for numeric comparison
+			double leftDouble = Convert.ToDouble(left);
+			double rightDouble = Convert.ToDouble(right);
+
+			if (_logger != null)
+			{
+				_logger.LogDebug("Numeric comparison: {left} ({leftType}) vs {right} ({rightType})",
+					left, left.GetType().Name, right, right.GetType().Name);
+			}
+
+			return leftDouble.CompareTo(rightDouble);
+		}
+
+		if (left is IComparable comparable && left.GetType() == right.GetType())
+		{
+			return comparable.CompareTo(right);
+		}
+
+		// Default to string comparison
+		return left.ToString().CompareTo(right.ToString());
+	}
+
+	private bool IsNumeric(object value)
+	{
+		return value is sbyte || value is byte || value is short || value is ushort ||
+			   value is int || value is uint || value is long || value is ulong ||
+			   value is float || value is double || value is decimal;
+	}
+
+	private int CompareString(string left, string right, BinaryOperator operatorEnum)
+	{
+		int comparison = string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
+
+		switch (operatorEnum)
+		{
+			case BinaryOperator.Equal:
+				return comparison == 0 ? 1 : 0;
+			case BinaryOperator.NotEqual:
+				return comparison != 0 ? 1 : 0;
+			case BinaryOperator.GreaterThan:
+				return comparison > 0 ? 1 : 0;
+			case BinaryOperator.GreaterThanOrEqual:
+				return comparison >= 0 ? 1 : 0;
+			case BinaryOperator.LessThan:
+				return comparison < 0 ? 1 : 0;
+			case BinaryOperator.LessThanOrEqual:
+				return comparison <= 0 ? 1 : 0;
+			default:
+				throw new NotImplementedException($"Operator {operatorEnum} not implemented for string comparison");
+		}
+	}
+
 	private IEnumerable<string> GetSelectedProperties(SelectClause selectClause)
 	{
 		return selectClause.Items
@@ -936,72 +1019,49 @@ public class CosmosDbQueryExecutor
 					}
 
 					// Handle numeric comparisons
-					else if (leftValue is JValue leftNumJValue &&
-							 (leftNumJValue.Type == JTokenType.Integer || leftNumJValue.Type == JTokenType.Float))
+					else if ((leftValue is JValue leftNumJValue &&
+							 (leftNumJValue.Type == JTokenType.Integer || leftNumJValue.Type == JTokenType.Float)) ||
+							 IsNumeric(leftValue))
 					{
-						// Try to get numeric values for comparison
-						if (leftNumJValue.Type == JTokenType.Integer)
+						// Extract the numeric value from JValue if needed
+						double leftNum;
+						if (leftValue is JValue leftJNum)
 						{
-							var leftInt = leftNumJValue.Value<int>();
-							if (rightValue is int rightInt)
-							{
-								if (_logger != null)
-								{
-									_logger.LogDebug("JValue integer comparison: {left} = {right}", leftInt, rightInt);
-								}
-								return leftInt == rightInt;
-							}
-							else if (rightValue is double rightDouble)
-							{
-								return leftInt == rightDouble;
-							}
-							else if (rightValue is JValue rightJValue1 && rightJValue1.Type == JTokenType.Integer)
-							{
-								var rightInt1 = rightJValue1.Value<int>();
-								return leftInt == rightInt1;
-							}
-							else if (rightValue is JValue rightJValue2 && rightJValue2.Type == JTokenType.Float)
-							{
-								var rightDouble1 = rightJValue2.Value<double>();
-								return leftInt == rightDouble1;
-							}
-							else if (int.TryParse(rightValue?.ToString(), out int parsedInt))
-							{
-								return leftInt == parsedInt;
-							}
+							leftNum = leftJNum.Value<double>();
 						}
-						else if (leftNumJValue.Type == JTokenType.Float)
+						else
 						{
-							var leftDouble = leftNumJValue.Value<double>();
-							if (rightValue is double rightDouble2)
-							{
-								if (_logger != null)
-								{
-									_logger.LogDebug("JValue float comparison: {left} = {right}", leftDouble, rightDouble2);
-								}
-								return leftDouble == rightDouble2;
-							}
-							else if (rightValue is int rightInt2)
-							{
-								return leftDouble == rightInt2;
-							}
-							else if (rightValue is JValue rightJValue3 && rightJValue3.Type == JTokenType.Float)
-							{
-								var rightDouble3 = rightJValue3.Value<double>();
-								return leftDouble == rightDouble3;
-							}
-							else if (rightValue is JValue rightJValue4 && rightJValue4.Type == JTokenType.Integer)
-							{
-								var rightInt3 = rightJValue4.Value<int>();
-								return leftDouble == rightInt3;
-							}
-							else if (double.TryParse(rightValue?.ToString(), out double parsedDouble))
-							{
-								return leftDouble == parsedDouble;
-							}
+							leftNum = Convert.ToDouble(leftValue);
 						}
+
+						// Extract the numeric value from right side
+						double rightNum;
+						if (rightValue is JValue rightJNum &&
+							(rightJNum.Type == JTokenType.Integer || rightJNum.Type == JTokenType.Float))
+						{
+							rightNum = rightJNum.Value<double>();
+						}
+						else if (IsNumeric(rightValue))
+						{
+							rightNum = Convert.ToDouble(rightValue);
+						}
+						else if (double.TryParse(rightValue?.ToString(), out double parsedNum))
+						{
+							rightNum = parsedNum;
+						}
+						else
+						{
+							// If right value is not numeric, we can't compare
+							return false;
+						}
+
+						if (_logger != null)
+						{
+							_logger.LogDebug("Numeric comparison: {left} = {right}", leftNum, rightNum);
+						}
+
+						return Math.Abs(leftNum - rightNum) < 0.000001; // Use small epsilon for floating point comparison
 					}
-					// Handle boolean comparisons
 					else if (leftValue is JValue leftBoolJValue && leftBoolJValue.Type == JTokenType.Boolean)
 					{
 						var leftBool = leftBoolJValue.Value<bool>();
@@ -1027,7 +1087,6 @@ public class CosmosDbQueryExecutor
 							return leftBool == parsedBool;
 						}
 					}
-
 					return Equals(leftValue, rightValue);
 
 				case BinaryOperator.NotEqual:
@@ -1053,15 +1112,191 @@ public class CosmosDbQueryExecutor
 					return !Equals(leftValue, rightValue);
 
 				case BinaryOperator.GreaterThan:
+					// Handle numeric comparisons for JValue objects
+					if ((leftValue is JValue leftNumJValueGT &&
+						(leftNumJValueGT.Type == JTokenType.Integer || leftNumJValueGT.Type == JTokenType.Float)) ||
+						IsNumeric(leftValue))
+					{
+						// Extract the numeric value from JValue if needed
+						double leftNum;
+						if (leftValue is JValue leftJNum)
+						{
+							leftNum = leftJNum.Value<double>();
+						}
+						else
+						{
+							leftNum = Convert.ToDouble(leftValue);
+						}
+
+						// Extract the numeric value from right side
+						double rightNum;
+						if (rightValue is JValue rightJNum &&
+							(rightJNum.Type == JTokenType.Integer || rightJNum.Type == JTokenType.Float))
+						{
+							rightNum = rightJNum.Value<double>();
+						}
+						else if (IsNumeric(rightValue))
+						{
+							rightNum = Convert.ToDouble(rightValue);
+						}
+						else if (double.TryParse(rightValue?.ToString(), out double parsedNum))
+						{
+							rightNum = parsedNum;
+						}
+						else
+						{
+							// If right value is not numeric, we can't compare
+							return false;
+						}
+
+						if (_logger != null)
+						{
+							_logger.LogDebug("Numeric GT comparison: {left} > {right}", leftNum, rightNum);
+						}
+
+						return leftNum > rightNum;
+					}
 					return CompareValues(leftValue, rightValue) > 0;
 
 				case BinaryOperator.LessThan:
+					// Handle numeric comparisons for JValue objects
+					if ((leftValue is JValue leftNumJValueLT &&
+						(leftNumJValueLT.Type == JTokenType.Integer || leftNumJValueLT.Type == JTokenType.Float)) ||
+						IsNumeric(leftValue))
+					{
+						// Extract the numeric value from JValue if needed
+						double leftNum;
+						if (leftValue is JValue leftJNum)
+						{
+							leftNum = leftJNum.Value<double>();
+						}
+						else
+						{
+							leftNum = Convert.ToDouble(leftValue);
+						}
+
+						// Extract the numeric value from right side
+						double rightNum;
+						if (rightValue is JValue rightJNum &&
+							(rightJNum.Type == JTokenType.Integer || rightJNum.Type == JTokenType.Float))
+						{
+							rightNum = rightJNum.Value<double>();
+						}
+						else if (IsNumeric(rightValue))
+						{
+							rightNum = Convert.ToDouble(rightValue);
+						}
+						else if (double.TryParse(rightValue?.ToString(), out double parsedNum))
+						{
+							rightNum = parsedNum;
+						}
+						else
+						{
+							// If right value is not numeric, we can't compare
+							return false;
+						}
+
+						if (_logger != null)
+						{
+							_logger.LogDebug("Numeric LT comparison: {left} < {right}", leftNum, rightNum);
+						}
+
+						return leftNum < rightNum;
+					}
 					return CompareValues(leftValue, rightValue) < 0;
 
 				case BinaryOperator.GreaterThanOrEqual:
+					// Handle numeric comparisons for JValue objects
+					if ((leftValue is JValue leftNumJValueGTE &&
+						(leftNumJValueGTE.Type == JTokenType.Integer || leftNumJValueGTE.Type == JTokenType.Float)) ||
+						IsNumeric(leftValue))
+					{
+						// Extract the numeric value from JValue if needed
+						double leftNum;
+						if (leftValue is JValue leftJNum)
+						{
+							leftNum = leftJNum.Value<double>();
+						}
+						else
+						{
+							leftNum = Convert.ToDouble(leftValue);
+						}
+
+						// Extract the numeric value from right side
+						double rightNum;
+						if (rightValue is JValue rightJNum &&
+							(rightJNum.Type == JTokenType.Integer || rightJNum.Type == JTokenType.Float))
+						{
+							rightNum = rightJNum.Value<double>();
+						}
+						else if (IsNumeric(rightValue))
+						{
+							rightNum = Convert.ToDouble(rightValue);
+						}
+						else if (double.TryParse(rightValue?.ToString(), out double parsedNum))
+						{
+							rightNum = parsedNum;
+						}
+						else
+						{
+							// If right value is not numeric, we can't compare
+							return false;
+						}
+
+						if (_logger != null)
+						{
+							_logger.LogDebug("Numeric GTE comparison: {left} >= {right}", leftNum, rightNum);
+						}
+
+						return leftNum >= rightNum;
+					}
 					return CompareValues(leftValue, rightValue) >= 0;
 
 				case BinaryOperator.LessThanOrEqual:
+					// Handle numeric comparisons for JValue objects
+					if ((leftValue is JValue leftNumJValueLTE &&
+						(leftNumJValueLTE.Type == JTokenType.Integer || leftNumJValueLTE.Type == JTokenType.Float)) ||
+						IsNumeric(leftValue))
+					{
+						// Extract the numeric value from JValue if needed
+						double leftNum;
+						if (leftValue is JValue leftJNum)
+						{
+							leftNum = leftJNum.Value<double>();
+						}
+						else
+						{
+							leftNum = Convert.ToDouble(leftValue);
+						}
+
+						// Extract the numeric value from right side
+						double rightNum;
+						if (rightValue is JValue rightJNum &&
+							(rightJNum.Type == JTokenType.Integer || rightJNum.Type == JTokenType.Float))
+						{
+							rightNum = rightJNum.Value<double>();
+						}
+						else if (IsNumeric(rightValue))
+						{
+							rightNum = Convert.ToDouble(rightValue);
+						}
+						else if (double.TryParse(rightValue?.ToString(), out double parsedNum))
+						{
+							rightNum = parsedNum;
+						}
+						else
+						{
+							// If right value is not numeric, we can't compare
+							return false;
+						}
+
+						if (_logger != null)
+						{
+							_logger.LogDebug("Numeric LTE comparison: {left} <= {right}", leftNum, rightNum);
+						}
+
+						return leftNum <= rightNum;
+					}
 					return CompareValues(leftValue, rightValue) <= 0;
 
 				case BinaryOperator.And:
@@ -1366,50 +1601,5 @@ public class CosmosDbQueryExecutor
 			default:
 				throw new NotImplementedException($"Function {function.Name} not implemented");
 		}
-	}
-
-	private int CompareValues(object left, object right)
-	{
-		if (left == null && right == null)
-		{
-			return 0;
-		}
-
-		if (left == null)
-		{
-			return -1;
-		}
-
-		if (right == null)
-		{
-			return 1;
-		}
-
-		if (left is IComparable comparable)
-		{
-			// Convert value to the same type as propValue if possible
-			if (left is int)
-			{
-				right = Convert.ToInt32(right);
-			}
-			else if (left is double)
-			{
-				right = Convert.ToDouble(right);
-			}
-			else if (left is decimal)
-			{
-				right = Convert.ToDecimal(right);
-			}
-			else if (left is long)
-			{
-				right = Convert.ToInt64(right);
-			}
-
-			int comparison = comparable.CompareTo(right);
-			return comparison;
-		}
-
-		// Default to string comparison
-		return left.ToString().CompareTo(right.ToString());
 	}
 }
