@@ -94,4 +94,14 @@ public class CosmosInMemoryCosmosDb : ICosmosDb
 	{
 		return new FakeContainer();
 	}
+
+	public Task CreateDatabaseIfNotExistsAsync(string databaseName)
+	{
+		return Task.CompletedTask;
+	}
+
+	public Database GetDatabase(string databaseName)
+	{
+		// todo
+	}
 }

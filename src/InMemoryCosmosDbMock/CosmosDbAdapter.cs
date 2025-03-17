@@ -104,4 +104,14 @@ public class CosmosDbAdapter : ICosmosDb
 	{
 		return _cosmosClient.GetContainer(databaseName, containerId);
 	}
+
+	public async Task CreateDatabaseIfNotExistsAsync(string databaseName)
+	{
+		await _cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
+	}
+
+	public Database GetDatabase(string databaseName)
+	{
+		return _cosmosClient.GetDatabase(databaseName);
+	}
 }
