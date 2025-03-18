@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
@@ -101,7 +102,7 @@ public class CosmosInMemoryCosmosDb : CosmosClient, ICosmosDb
 		return new FakeContainer();
 	}
 
-	public Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName)
+	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)
 	{
 		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(databaseName));
 	}

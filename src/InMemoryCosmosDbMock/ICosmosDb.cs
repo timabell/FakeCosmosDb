@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;
@@ -12,6 +13,6 @@ public interface ICosmosDb
 	Task<IEnumerable<JObject>> QueryAsync(string containerName, string sql);
 	Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null);
 	Container GetContainer(string databaseName, string containerId);
-	Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName);
+	Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default);
 	Database GetDatabase(string databaseName);
 }

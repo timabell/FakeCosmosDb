@@ -1,6 +1,7 @@
 // Adapter for real CosmosDB
 
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
@@ -105,9 +106,9 @@ public class CosmosDbAdapter : ICosmosDb
 		return _cosmosClient.GetContainer(databaseName, containerId);
 	}
 
-	public async Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName)
+	public async Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)
 	{
-		return await _cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
+		return await _cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName, throughput, requestOptions, cancellationToken);
 	}
 
 	public Database GetDatabase(string databaseName)
