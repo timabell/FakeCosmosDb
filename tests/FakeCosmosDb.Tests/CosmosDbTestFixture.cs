@@ -25,7 +25,7 @@ public class CosmosDbTestFixture : IDisposable
 		else
 		{
 			// Use In-Memory Mock
-			Db = new CosmosInMemoryCosmosDb(_logger);
+			Db = new FakeCosmosDb(_logger);
 		}
 
 		Db.AddContainerAsync(ContainerName).Wait();

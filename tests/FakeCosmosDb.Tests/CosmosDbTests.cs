@@ -35,7 +35,7 @@ public class CosmosDbTests
 
 	public static IEnumerable<object[]> TestConfigurations()
 	{
-		yield return new object[] { new CosmosInMemoryCosmosDb(_logger) };
+		yield return new object[] { new FakeCosmosDb(_logger) };
 		// Skip the real adapter in normal test runs
 		// yield return new object[] { new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
 	}

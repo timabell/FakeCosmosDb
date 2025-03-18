@@ -8,13 +8,13 @@ namespace TimAbell.FakeCosmosDb.Tests;
 
 public class CosmosDbMockTests
 {
-	private readonly CosmosInMemoryCosmosDb _db;
+	private readonly FakeCosmosDb _db;
 	private readonly ITestOutputHelper _output;
 
 	public CosmosDbMockTests(ITestOutputHelper output)
 	{
 		_output = output;
-		_db = new CosmosInMemoryCosmosDb(new TestLogger(output));
+		_db = new FakeCosmosDb(new TestLogger(output));
 		_db.AddContainerAsync("Users").Wait();
 	}
 

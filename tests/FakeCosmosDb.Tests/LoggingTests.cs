@@ -21,7 +21,7 @@ namespace TimAbell.FakeCosmosDb.Tests
 		{
 			// Arrange
 			var logger = new TestLogger(_output);
-			var cosmosDb = new CosmosInMemoryCosmosDb(logger);
+			var cosmosDb = new FakeCosmosDb(logger);
 
 			// Create a container and add some test data
 			await cosmosDb.AddContainerAsync("TestContainer");

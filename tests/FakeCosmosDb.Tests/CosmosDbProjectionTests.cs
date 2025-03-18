@@ -11,7 +11,7 @@ namespace TimAbell.FakeCosmosDb.Tests;
 
 public class CosmosDbProjectionTests
 {
-	private readonly CosmosInMemoryCosmosDb _db;
+	private readonly FakeCosmosDb _db;
 	private readonly string _containerName = "ProjectionTest";
 	private readonly ITestOutputHelper _output;
 	private readonly ILogger _logger;
@@ -20,7 +20,7 @@ public class CosmosDbProjectionTests
 	{
 		_output = output;
 		_logger = new TestLogger(output);
-		_db = new CosmosInMemoryCosmosDb(_logger);
+		_db = new FakeCosmosDb(_logger);
 		_db.AddContainerAsync(_containerName).Wait();
 		SeedTestData().Wait();
 	}

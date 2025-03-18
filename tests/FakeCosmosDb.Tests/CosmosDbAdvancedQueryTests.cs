@@ -8,14 +8,14 @@ namespace TimAbell.FakeCosmosDb.Tests;
 
 public class CosmosDbAdvancedQueryTests
 {
-	private readonly CosmosInMemoryCosmosDb _db;
+	private readonly FakeCosmosDb _db;
 	private readonly string _containerName = "AdvancedQueryTest";
 	private readonly ITestOutputHelper _output;
 
 	public CosmosDbAdvancedQueryTests(ITestOutputHelper output)
 	{
 		_output = output;
-		_db = new CosmosInMemoryCosmosDb(new TestLogger(output));
+		_db = new FakeCosmosDb(new TestLogger(output));
 		_db.AddContainerAsync(_containerName).Wait();
 		SeedTestData().Wait();
 	}

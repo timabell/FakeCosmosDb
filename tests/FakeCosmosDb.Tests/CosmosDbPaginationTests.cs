@@ -8,14 +8,14 @@ namespace TimAbell.FakeCosmosDb.Tests;
 
 public class CosmosDbPaginationTests
 {
-	private readonly CosmosInMemoryCosmosDb _db;
+	private readonly FakeCosmosDb _db;
 	private readonly string _containerName = "PaginationTest";
 	private readonly ITestOutputHelper _output;
 
 	public CosmosDbPaginationTests(ITestOutputHelper output)
 	{
 		_output = output;
-		_db = new CosmosInMemoryCosmosDb(new TestLogger(output));
+		_db = new FakeCosmosDb(new TestLogger(output));
 		_db.AddContainerAsync(_containerName).Wait();
 		SeedTestData().Wait();
 	}

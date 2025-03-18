@@ -16,20 +16,20 @@ namespace TimAbell.FakeCosmosDb;
 /// - Depend on the ICosmosDb interface and inject this class in place of the real CosmosDb, this is clearer but requires more changes to production code.
 /// - Use the fact that this class inherits from the real CosmosClient class and use it as a drop-in replacement for the real CosmosClient.
 /// </summary>
-public class CosmosInMemoryCosmosDb : CosmosClient, ICosmosDb
+public class FakeCosmosDb : CosmosClient, ICosmosDb
 {
 	private readonly Dictionary<string, CosmosDbContainer> _containers = new();
 	private readonly CosmosDbSqlQueryParser _queryParser;
 	private readonly ILogger _logger;
 	private readonly CosmosDbQueryExecutor _queryExecutor;
 
-	public CosmosInMemoryCosmosDb()
+	public FakeCosmosDb()
 	{
 		_queryParser = new CosmosDbSqlQueryParser();
 		_queryExecutor = new CosmosDbQueryExecutor();
 	}
 
-	public CosmosInMemoryCosmosDb(ILogger logger)
+	public FakeCosmosDb(ILogger logger)
 	{
 		_logger = logger;
 		_queryParser = new CosmosDbSqlQueryParser(_logger);
