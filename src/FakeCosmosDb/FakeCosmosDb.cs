@@ -111,6 +111,13 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 	{
 		return new FakeDatabase(databaseName);
 	}
+
+	protected override void Dispose(bool disposing)
+	{
+		// No-op.
+		// Don't call base.Dispose(disposing) to prevent NullReferenceException.
+		// The base implementation tries to dispose resources we don't have.
+	}
 }
 
 public class FakeDatabaseResponse : DatabaseResponse
