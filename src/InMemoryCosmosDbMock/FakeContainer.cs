@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Scripts;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Microsoft.Extensions.Logging;
 using TimAbell.MockableCosmos.Parsing;
@@ -95,7 +96,43 @@ public class FakeContainer : Container
 
 	public override Task<ItemResponse<T>> ReadItemAsync<T>(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new NotImplementedException();
+		JObject item;
+		var partitionKeyValue = (string)(JToken.Parse(partitionKey.ToString()) as JArray)[0]; // Doesn't seem to be a better way to get the partition key value, no access to internal Components
+
+		if (partitionKey == PartitionKey.None || string.IsNullOrEmpty(partitionKeyValue))
+		{
+			// With empty partition key, just find by ID
+			item = _store.FirstOrDefault(doc => doc["id"]?.ToString() == id);
+		}
+		else
+		{
+			// Find by both ID and partition key
+			item = _store.FirstOrDefault(doc =>
+				doc["id"]?.ToString() == id &&
+				doc["partitionKey"]?.ToString() == partitionKeyValue);
+		}
+
+		if (item == null)
+		{
+			var notFoundException = new CosmosException(
+				message: $"Item with id {id} not found",
+				statusCode: HttpStatusCode.NotFound,
+				subStatusCode: 0,
+				activityId: Guid.NewGuid().ToString(),
+				requestCharge: 0);
+
+			throw notFoundException;
+		}
+
+		var resultObject = item.ToObject<T>();
+		var response = new FakeItemResponse<T>(
+			item: resultObject,
+			statusCode: HttpStatusCode.OK,
+			requestCharge: 0,
+			etag: $"\"{Guid.NewGuid().ToString()}\"",
+			headers: new Headers());
+
+		return Task.FromResult<ItemResponse<T>>(response);
 	}
 
 	public override Task<ResponseMessage> UpsertItemStreamAsync(Stream streamPayload, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
@@ -331,5 +368,27 @@ public class FakeContainer : Container
 		public override string ActivityId => string.Empty;
 		public override string ETag => string.Empty;
 		public override CosmosDiagnostics Diagnostics { get; }
+	}
+
+	// Custom implementation of ItemResponse<T> for the FakeContainer
+	private class FakeItemResponse<T> : ItemResponse<T>
+	{
+		private readonly T _item;
+
+		public FakeItemResponse(T item, HttpStatusCode statusCode, double requestCharge, string etag, Headers headers)
+		{
+			_item = item;
+			StatusCode = statusCode;
+			RequestCharge = requestCharge;
+			ETag = etag;
+			Headers = headers;
+		}
+
+		public override T Resource => _item;
+
+		public override HttpStatusCode StatusCode { get; }
+		public override double RequestCharge { get; }
+		public override string ETag { get; }
+		public override Headers Headers { get; }
 	}
 }
