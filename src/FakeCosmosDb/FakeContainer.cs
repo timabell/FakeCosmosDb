@@ -101,13 +101,15 @@ public class FakeContainer : Container
 		if (partitionKey == PartitionKey.None || string.IsNullOrEmpty(partitionKeyValue))
 		{
 			// With empty partition key, just find by ID
-			item = _store.FirstOrDefault(doc => doc["id"]?.ToString() == id);
+			item = _store.FirstOrDefault(doc =>
+				doc["id"]?.ToString() == id ||
+				doc["Id"]?.ToString() == id);
 		}
 		else
 		{
 			// Find by both ID and partition key
 			item = _store.FirstOrDefault(doc =>
-				doc["id"]?.ToString() == id &&
+				(doc["id"]?.ToString() == id || doc["Id"]?.ToString() == id) &&
 				doc["partitionKey"]?.ToString() == partitionKeyValue);
 		}
 
@@ -147,11 +149,17 @@ public class FakeContainer : Container
 		// Extract the partition key value from the provided partition key
 		string partitionKeyValue = ExtractPartitionKeyValue(partitionKey);
 
-		// Get the item's ID
-		var id = itemAsJObject["id"]?.ToString();
+		// Get the item's ID - check for both lowercase "id" and uppercase "Id"
+		var id = itemAsJObject["id"]?.ToString() ?? itemAsJObject["Id"]?.ToString();
 		if (string.IsNullOrEmpty(id))
 		{
-			throw new ArgumentException("Item must have an 'id' property");
+			throw new ArgumentException("Item must have an 'id' or 'Id' property");
+		}
+
+		// Ensure the document has a lowercase "id" property for consistency with Cosmos DB
+		if (itemAsJObject["id"] == null && itemAsJObject["Id"] != null)
+		{
+			itemAsJObject["id"] = itemAsJObject["Id"];
 		}
 
 		// Find existing item by ID and partition key
@@ -159,13 +167,15 @@ public class FakeContainer : Container
 		if (string.IsNullOrEmpty(partitionKeyValue))
 		{
 			// With empty partition key, just find by ID
-			existingItem = _store.FirstOrDefault(doc => doc["id"]?.ToString() == id);
+			existingItem = _store.FirstOrDefault(doc =>
+				doc["id"]?.ToString() == id ||
+				doc["Id"]?.ToString() == id);
 		}
 		else
 		{
 			// Find by both ID and partition key
 			existingItem = _store.FirstOrDefault(doc =>
-				doc["id"]?.ToString() == id &&
+				(doc["id"]?.ToString() == id || doc["Id"]?.ToString() == id) &&
 				doc["partitionKey"]?.ToString() == partitionKeyValue);
 		}
 

@@ -450,5 +450,150 @@ namespace TimAbell.FakeCosmosDb.Tests
 			fakeContainer.Documents.Should().ContainEquivalentOf(existingItem);
 			fakeContainer.Documents.Should().ContainEquivalentOf(newItem);
 		}
+
+		[Fact]
+		public async Task ReadItemAsync_WithUppercaseId_ShouldFindItem()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+			const string partitionKeyValue = "partition1";
+
+			// Add test data with uppercase "Id" property
+			var testItem = new JObject
+			{
+				["Id"] = "uppercaseId1",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "Test Item With Uppercase Id",
+				["value"] = 42,
+			};
+
+			fakeContainer.Documents.Add(testItem);
+
+			// Act
+			var response = await fakeContainer.ReadItemAsync<JObject>("uppercaseId1", new PartitionKey(partitionKeyValue));
+
+			// Assert
+			response.Should().NotBeNull();
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
+			response.Resource.Should().NotBeNull();
+			response.Resource["Id"].ToString().Should().Be("uppercaseId1");
+			response.Resource["partitionKey"].ToString().Should().Be(partitionKeyValue);
+			response.Resource["name"].ToString().Should().Be("Test Item With Uppercase Id");
+			response.Resource["value"].Value<int>().Should().Be(42);
+			response.ETag.Should().NotBeNullOrEmpty();
+		}
+
+		[Fact]
+		public async Task UpsertItemAsync_WithUppercaseId_ShouldAddToContainer()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+			const string partitionKeyValue = "partition1";
+
+			var newItem = new JObject
+			{
+				["Id"] = "newUppercaseItem1",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "New Item With Uppercase Id",
+				["value"] = 42,
+			};
+
+			// Act
+			var response = await fakeContainer.UpsertItemAsync<JObject>(newItem, new PartitionKey(partitionKeyValue));
+
+			// Assert
+			response.Should().NotBeNull();
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
+			response.Resource.Should().NotBeNull();
+			response.Resource["Id"].ToString().Should().Be("newUppercaseItem1");
+			response.Resource["id"].ToString().Should().Be("newUppercaseItem1"); // Should also have lowercase id
+			response.Resource["partitionKey"].ToString().Should().Be(partitionKeyValue);
+			response.Resource["name"].ToString().Should().Be("New Item With Uppercase Id");
+			response.Resource["value"].Value<int>().Should().Be(42);
+			response.ETag.Should().NotBeNullOrEmpty();
+
+			// Verify item was added to container
+			fakeContainer.Documents.Should().HaveCount(1);
+			fakeContainer.Documents.First()["Id"].ToString().Should().Be("newUppercaseItem1");
+			fakeContainer.Documents.First()["id"].ToString().Should().Be("newUppercaseItem1");
+		}
+
+		[Fact]
+		public async Task UpsertItemAsync_UpdateExistingItemWithUppercaseId_ShouldUpdateInContainer()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+			const string partitionKeyValue = "partition1";
+
+			// Add initial item with uppercase Id
+			var existingItem = new JObject
+			{
+				["Id"] = "existingUppercaseItem1",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "Original Item With Uppercase Id",
+				["value"] = 42,
+			};
+			fakeContainer.Documents.Add(existingItem);
+
+			// Create updated version of the item
+			var updatedItem = new JObject
+			{
+				["Id"] = "existingUppercaseItem1",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "Updated Item With Uppercase Id",
+				["value"] = 84,
+				["newProperty"] = "added property",
+			};
+
+			// Act
+			var response = await fakeContainer.UpsertItemAsync<JObject>(updatedItem, new PartitionKey(partitionKeyValue));
+
+			// Assert
+			response.Should().NotBeNull();
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
+			response.Resource.Should().NotBeNull();
+			response.Resource["Id"].ToString().Should().Be("existingUppercaseItem1");
+			response.Resource["id"].ToString().Should().Be("existingUppercaseItem1"); // Should also have lowercase id
+			response.Resource["partitionKey"].ToString().Should().Be(partitionKeyValue);
+			response.Resource["name"].ToString().Should().Be("Updated Item With Uppercase Id");
+			response.Resource["value"].Value<int>().Should().Be(84);
+			response.Resource["newProperty"].ToString().Should().Be("added property");
+			response.ETag.Should().NotBeNullOrEmpty();
+
+			// Verify container still has only one item (the updated one)
+			fakeContainer.Documents.Should().HaveCount(1);
+			fakeContainer.Documents.First()["Id"].ToString().Should().Be("existingUppercaseItem1");
+			fakeContainer.Documents.First()["id"].ToString().Should().Be("existingUppercaseItem1");
+			fakeContainer.Documents.First()["name"].ToString().Should().Be("Updated Item With Uppercase Id");
+		}
+
+		[Fact]
+		public async Task ReadItemAsync_FindItemWithUppercaseIdUsingLowercaseId_ShouldFindItem()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+			const string partitionKeyValue = "partition1";
+
+			// Add test data with uppercase "Id" property
+			var testItem = new JObject
+			{
+				["Id"] = "mixedCaseTest",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "Test Item With Uppercase Id",
+				["value"] = 42,
+			};
+
+			fakeContainer.Documents.Add(testItem);
+
+			// Act - search using lowercase id
+			var response = await fakeContainer.ReadItemAsync<JObject>("mixedCaseTest", new PartitionKey(partitionKeyValue));
+
+			// Assert
+			response.Should().NotBeNull();
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
+			response.Resource.Should().NotBeNull();
+			response.Resource["Id"].ToString().Should().Be("mixedCaseTest");
+			response.Resource["partitionKey"].ToString().Should().Be(partitionKeyValue);
+		}
 	}
 }
