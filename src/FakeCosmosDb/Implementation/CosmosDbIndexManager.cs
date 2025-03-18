@@ -3,7 +3,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 
-namespace TimAbell.FakeCosmosDb;
+namespace TimAbell.FakeCosmosDb.Implementation;
 
 public interface ICosmosDbIndexManager
 {

@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
-using TimAbell.FakeCosmosDb.Parsing;
+using TimAbell.FakeCosmosDb.SqlParser;
 
-namespace TimAbell.FakeCosmosDb;
+namespace TimAbell.FakeCosmosDb.Implementation;
 
-public class CosmosDbContainer
+public class InMemoryContainer
 {
-	private readonly List<JObject> _store = new List<JObject>();
+	private readonly List<JObject> _store = new();
 	private readonly ICosmosDbIndexManager _indexManager = new CosmosDbIndexManager();
 	private readonly ICosmosDbPaginationManager _paginationManager = new CosmosDbPaginationManager();
 	private readonly CosmosDbSqlQueryParser _queryParser = new CosmosDbSqlQueryParser();
@@ -18,7 +18,7 @@ public class CosmosDbContainer
 	// Add a property to access the store
 	public List<JObject> Documents => _store;
 
-	public CosmosDbContainer(ILogger logger = null)
+	public InMemoryContainer(ILogger logger = null)
 	{
 		_queryExecutor = new CosmosDbQueryExecutor(logger);
 	}

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Fluent;
 
-namespace TimAbell.FakeCosmosDb;
+namespace TimAbell.FakeCosmosDb.Implementation;
 
 public class FakeDatabase : Database
 {

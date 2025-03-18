@@ -5,9 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
-using TimAbell.FakeCosmosDb.Parsing;
+using TimAbell.FakeCosmosDb.SqlParser;
 
-namespace TimAbell.FakeCosmosDb;
+namespace TimAbell.FakeCosmosDb.Implementation;
 
 public class CosmosDbQueryExecutor
 {

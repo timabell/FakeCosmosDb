@@ -1,11 +1,11 @@
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
-using TimAbell.FakeCosmosDb.Parsing;
+using TimAbell.FakeCosmosDb.SqlParser;
 using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace TimAbell.FakeCosmosDb.Tests;
+namespace TimAbell.FakeCosmosDb.Tests.SqlParserTests;
 
 public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 {

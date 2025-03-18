@@ -1,10 +1,9 @@
 using System;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
-using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit.Abstractions;
 
-namespace TimAbell.FakeCosmosDb.Tests;
+namespace TimAbell.FakeCosmosDb.Tests.Utilities;
 
 public class CosmosDbTestFixture : IDisposable
 {

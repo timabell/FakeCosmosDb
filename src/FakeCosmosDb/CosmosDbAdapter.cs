@@ -10,6 +10,11 @@ using Newtonsoft.Json.Linq;
 
 namespace TimAbell.FakeCosmosDb;
 
+/// <summary>
+/// Optional. Provides concrete implementation of <see cref="ICosmosDb"/> that connects to real CosmosClient.
+/// You can either use this if you want to depend on ICosmosDb to add some separation,
+/// or just depend on directly on the real CosmosClient and FakeCosmosDb will be a drop-in replacement.
+/// </summary>
 public class CosmosDbAdapter : ICosmosDb
 {
 	private readonly CosmosClient _cosmosClient;
