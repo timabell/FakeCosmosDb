@@ -96,7 +96,7 @@ public class FakeContainer : Container
 	public override Task<ItemResponse<T>> ReadItemAsync<T>(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
 		JObject item;
-		var partitionKeyValue = (string)(JToken.Parse(partitionKey.ToString()) as JArray)[0]; // Doesn't seem to be a better way to get the partition key value, no access to internal Components
+		var partitionKeyValue = ExtractPartitionKeyValue(partitionKey);
 
 		if (partitionKey == PartitionKey.None || string.IsNullOrEmpty(partitionKeyValue))
 		{
@@ -141,7 +141,53 @@ public class FakeContainer : Container
 
 	public override Task<ItemResponse<T>> UpsertItemAsync<T>(T item, PartitionKey? partitionKey = null, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new NotImplementedException();
+		// Convert the item to JObject for storage
+		var itemAsJObject = JObject.FromObject(item);
+
+		// Extract the partition key value from the provided partition key
+		string partitionKeyValue = ExtractPartitionKeyValue(partitionKey);
+
+		// Get the item's ID
+		var id = itemAsJObject["id"]?.ToString();
+		if (string.IsNullOrEmpty(id))
+		{
+			throw new ArgumentException("Item must have an 'id' property");
+		}
+
+		// Find existing item by ID and partition key
+		JObject existingItem;
+		if (string.IsNullOrEmpty(partitionKeyValue))
+		{
+			// With empty partition key, just find by ID
+			existingItem = _store.FirstOrDefault(doc => doc["id"]?.ToString() == id);
+		}
+		else
+		{
+			// Find by both ID and partition key
+			existingItem = _store.FirstOrDefault(doc =>
+				doc["id"]?.ToString() == id &&
+				doc["partitionKey"]?.ToString() == partitionKeyValue);
+		}
+
+		// If item exists, remove it from the store
+		if (existingItem != null)
+		{
+			_store.Remove(existingItem);
+		}
+
+		// Add the new/updated item to the store
+		_store.Add(itemAsJObject);
+
+		// Create a response with the item
+		var resultObject = itemAsJObject.ToObject<T>();
+		var response = new FakeItemResponse<T>(
+			item: resultObject,
+			statusCode: HttpStatusCode.OK,
+			requestCharge: 0,
+			etag: $"\"{Guid.NewGuid().ToString()}\"",
+			headers: new Headers());
+
+		return Task.FromResult<ItemResponse<T>>(response);
 	}
 
 	public override Task<ResponseMessage> ReplaceItemStreamAsync(Stream streamPayload, string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
@@ -296,6 +342,17 @@ public class FakeContainer : Container
 	public override Database Database { get; }
 	public override Conflicts Conflicts { get; }
 	public override Scripts Scripts { get; }
+
+	private string ExtractPartitionKeyValue(PartitionKey? partitionKey)
+	{
+		if (partitionKey == null || partitionKey == PartitionKey.None)
+		{
+			return string.Empty;
+		}
+
+		// Doesn't seem to be a better way to get the partition key value, no access to internal Components
+		return (string)(JToken.Parse(partitionKey.ToString()) as JArray)[0];
+	}
 
 	// Custom implementation of FeedIterator<T> for the FakeContainer
 	private class FakeFeedIterator<T> : FeedIterator<T>

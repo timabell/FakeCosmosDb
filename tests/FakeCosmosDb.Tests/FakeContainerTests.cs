@@ -325,5 +325,130 @@ namespace TimAbell.FakeCosmosDb.Tests
 			// Assert
 			Assert.True(true);  // This test is just for debugging
 		}
+
+		[Fact]
+		public async Task UpsertItemAsync_NewItem_ShouldAddToContainer()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+			const string partitionKeyValue = "partition1";
+
+			var newItem = new JObject
+			{
+				["id"] = "newItem1",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "New Item",
+				["value"] = 42,
+			};
+
+			// Act
+			var response = await fakeContainer.UpsertItemAsync<JObject>(newItem, new PartitionKey(partitionKeyValue));
+
+			// Assert
+			response.Should().NotBeNull();
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
+			response.Resource.Should().NotBeNull();
+			response.Resource["id"].ToString().Should().Be("newItem1");
+			response.Resource["partitionKey"].ToString().Should().Be(partitionKeyValue);
+			response.Resource["name"].ToString().Should().Be("New Item");
+			response.Resource["value"].Value<int>().Should().Be(42);
+			response.ETag.Should().NotBeNullOrEmpty();
+
+			// Verify item was added to container
+			fakeContainer.Documents.Should().HaveCount(1);
+			fakeContainer.Documents.First().Should().BeEquivalentTo(newItem);
+		}
+
+		[Fact]
+		public async Task UpsertItemAsync_ExistingItem_ShouldUpdateInContainer()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+			const string partitionKeyValue = "partition1";
+
+			// Add initial item
+			var existingItem = new JObject
+			{
+				["id"] = "existingItem1",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "Original Item",
+				["value"] = 42,
+			};
+			fakeContainer.Documents.Add(existingItem);
+
+			// Create updated version of the item
+			var updatedItem = new JObject
+			{
+				["id"] = "existingItem1",
+				["partitionKey"] = partitionKeyValue,
+				["name"] = "Updated Item",
+				["value"] = 84,
+				["newProperty"] = "added property",
+			};
+
+			// Act
+			var response = await fakeContainer.UpsertItemAsync<JObject>(updatedItem, new PartitionKey(partitionKeyValue));
+
+			// Assert
+			response.Should().NotBeNull();
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
+			response.Resource.Should().NotBeNull();
+			response.Resource["id"].ToString().Should().Be("existingItem1");
+			response.Resource["partitionKey"].ToString().Should().Be(partitionKeyValue);
+			response.Resource["name"].ToString().Should().Be("Updated Item");
+			response.Resource["value"].Value<int>().Should().Be(84);
+			response.Resource["newProperty"].ToString().Should().Be("added property");
+			response.ETag.Should().NotBeNullOrEmpty();
+
+			// Verify container still has only one item (the updated one)
+			fakeContainer.Documents.Should().HaveCount(1);
+			fakeContainer.Documents.First().Should().BeEquivalentTo(updatedItem);
+		}
+
+		[Fact]
+		public async Task UpsertItemAsync_SameIdDifferentPartitionKey_ShouldAddNewItem()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+			const string partitionKey1 = "partition1";
+			const string partitionKey2 = "partition2";
+
+			// Add initial item
+			var existingItem = new JObject
+			{
+				["id"] = "duplicateId",
+				["partitionKey"] = partitionKey1,
+				["name"] = "Item in Partition 1",
+				["value"] = 42,
+			};
+			fakeContainer.Documents.Add(existingItem);
+
+			// Create new item with same ID but different partition key
+			var newItem = new JObject
+			{
+				["id"] = "duplicateId",
+				["partitionKey"] = partitionKey2,
+				["name"] = "Item in Partition 2",
+				["value"] = 84,
+			};
+
+			// Act
+			var response = await fakeContainer.UpsertItemAsync<JObject>(newItem, new PartitionKey(partitionKey2));
+
+			// Assert
+			response.Should().NotBeNull();
+			response.StatusCode.Should().Be(HttpStatusCode.OK);
+			response.Resource.Should().NotBeNull();
+			response.Resource["id"].ToString().Should().Be("duplicateId");
+			response.Resource["partitionKey"].ToString().Should().Be(partitionKey2);
+			response.Resource["name"].ToString().Should().Be("Item in Partition 2");
+			response.Resource["value"].Value<int>().Should().Be(84);
+			response.ETag.Should().NotBeNullOrEmpty();
+
+			// Verify container now has two items
+			fakeContainer.Documents.Should().HaveCount(2);
+			fakeContainer.Documents.Should().ContainEquivalentOf(existingItem);
+			fakeContainer.Documents.Should().ContainEquivalentOf(newItem);
+		}
 	}
 }
