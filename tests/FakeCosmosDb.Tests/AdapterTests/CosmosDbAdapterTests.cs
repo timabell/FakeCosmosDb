@@ -18,7 +18,7 @@ public class CosmosDbAdapterTests
 		_output = output;
 	}
 
-	// Skip these tests when running in CI since they require the CosmosDB Emulator
+	// todo: Add tests for the CosmosDbAdapter
 	[Fact(Skip = "Requires CosmosDB Emulator")]
 	public async Task Adapter_CanBeUsedWithCosmosDbInterface()
 	{
