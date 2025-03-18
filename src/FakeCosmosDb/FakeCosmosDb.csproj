@@ -12,6 +12,27 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RootNamespace>TimAbell.FakeCosmosDb</RootNamespace>
     <AssemblyName>FakeCosmosDb</AssemblyName>
+
+    <PackageId>FakeCosmosDb</PackageId>
+    <Description>An in-memory fake implementation of Azure CosmosDB for testing</Description>
+
+    <Authors>FakeCosmosDb Contributors</Authors>
+    <RepositoryUrl>https://github.com/timabell/FakeCosmosDb</RepositoryUrl>
+    <PackageTags>cosmosdb;fake;testing;in-memory</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <IsTrimmable>true</IsTrimmable>
+    <Company>Tim Abell</Company>
+    <Product>FakeCosmosDb</Product>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
