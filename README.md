@@ -1,12 +1,12 @@
-# InMemoryCosmosDbMock
+# Tim Abell FakeCosmosDb
 
-This library provides a high-fidelity **in-memory CosmosDB mock** for unit testing, with optional support for running tests against the **real CosmosDB Emulator**.
+This library provides an **in-memory CosmosDB fake** for unit testing, with optional support for running tests against the **real CosmosDB Emulator**.
 
 ## Features
 ✅ Supports SQL-like queries (`SELECT * FROM c WHERE c.Name = 'Alice'`)  
 ✅ Fully **in-memory**, no dependencies required  
 ✅ **Multi-container** support  
-✅ Can switch between **mock mode and real CosmosDB mode**  
+✅ Can switch between **fake mode and real CosmosDB mode**  
 ✅ **GitHub Actions CI/CD ready**  
 ✅ **Efficient indexing** for fast queries  
 ✅ Support for **pagination** with continuation tokens  
@@ -14,40 +14,40 @@ This library provides a high-fidelity **in-memory CosmosDB mock** for unit testi
 ✅ **SELECT projections** to return only specific fields  
 
 ## Installation
-To use the in-memory CosmosDB mock, install via NuGet:
+To use the in-memory CosmosDB fake, install via NuGet:
 
 ```sh
-dotnet add package InMemoryCosmosDbMock
+dotnet add package # TBC
 ```
 
 ## Quick Start
 
 ```csharp
-// Create an instance of the mock
-var cosmosDbMock = new InMemoryCosmosDbMock();
+// Create an instance of the fake
+var cosmosDb = new FakeCosmosDb();
 
 // Create a container
-await cosmosDbMock.AddContainerAsync("Users");
+await cosmosDb.AddContainerAsync("Users");
 
 // Add an item
-await cosmosDbMock.AddItemAsync("Users", new { 
+await cosmosDb.AddItemAsync("Users", new { 
     id = "1", 
     Name = "Alice", 
     Email = "alice@example.com" 
 });
 
 // Query items
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT * FROM c WHERE c.Name = 'Alice'");
+var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE c.Name = 'Alice'");
 
 // Use pagination
-var (pageResults, continuationToken) = await cosmosDbMock.QueryWithPaginationAsync(
+var (pageResults, continuationToken) = await cosmosDb.QueryWithPaginationAsync(
     "Users", 
     "SELECT * FROM c", 
     maxItemCount: 10
 );
 
 // Get the next page using the continuation token
-var (nextPageResults, nextContinuationToken) = await cosmosDbMock.QueryWithPaginationAsync(
+var (nextPageResults, nextContinuationToken) = await cosmosDb.QueryWithPaginationAsync(
     "Users", 
     "SELECT * FROM c", 
     maxItemCount: 10, 
@@ -57,58 +57,58 @@ var (nextPageResults, nextContinuationToken) = await cosmosDbMock.QueryWithPagin
 
 ## Advanced Queries
 
-The mock supports a wide range of CosmosDB SQL query features:
+The fake supports a wide range of CosmosDB SQL query features:
 
 ### Basic Filtering
 
 ```csharp
 // Equality
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT * FROM c WHERE c.Name = 'Alice'");
+var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE c.Name = 'Alice'");
 
 // Numeric comparisons
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT * FROM c WHERE c.Age > 30");
+var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE c.Age > 30");
 
 // String functions
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT * FROM c WHERE CONTAINS(c.Name, 'Ali')");
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT * FROM c WHERE STARTSWITH(c.Email, 'alice')");
+var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE CONTAINS(c.Name, 'Ali')");
+var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE STARTSWITH(c.Email, 'alice')");
 ```
 
 ### Projections
 
 ```csharp
 // Select specific fields
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT c.Name, c.Email FROM c");
+var results = await cosmosDb.QueryAsync("Users", "SELECT c.Name, c.Email FROM c");
 
 // Select nested properties
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT c.Name, c.Address.City FROM c");
+var results = await cosmosDb.QueryAsync("Users", "SELECT c.Name, c.Address.City FROM c");
 ```
 
 ### Ordering and Limiting
 
 ```csharp
 // Order by a field
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT * FROM c ORDER BY c.Name");
+var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c ORDER BY c.Name");
 
 // Limit results
-var results = await cosmosDbMock.QueryAsync("Users", "SELECT * FROM c LIMIT 10");
+var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c LIMIT 10");
 ```
 
 ## Testing with xUnit
 
-### Using the Mock in Tests
+### Using the Fake in Tests
 
 ```csharp
 public class UserServiceTests
 {
-    private readonly ICosmosDbMock _db;
+    private readonly ICosmosDb _db;
     private readonly UserService _userService;
 
     public UserServiceTests()
     {
-        _db = new InMemoryCosmosDbMock();
+        _db = new FakeCosmosDb();
         _db.AddContainerAsync("Users").Wait();
         
-        // Inject the mock into your service
+        // Inject the fake into your service
         _userService = new UserService(_db);
     }
 
@@ -127,22 +127,22 @@ public class UserServiceTests
 }
 ```
 
-### Testing with Both Mock and Real CosmosDB
+### Testing with Both Fake and Real CosmosDB
 
-You can run the same tests against both the in-memory mock and the real CosmosDB emulator:
+You can run the same tests against both the in-memory fake and the real CosmosDB emulator:
 
 ```csharp
 public class CosmosDbTests
 {
     public static IEnumerable<object[]> TestConfigurations()
     {
-        yield return new object[] { new InMemoryCosmosDbMock() };
-        yield return new object[] { new CosmosDbMockAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
+        yield return new object[] { new FakeCosmosDb() };
+        yield return new object[] { new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
     }
 
     [Theory]
     [MemberData(nameof(TestConfigurations))]
-    public async Task Can_Insert_And_Query_Item(ICosmosDbMock db)
+    public async Task Can_Insert_And_Query_Item(ICosmosDb db)
     {
         var containerName = "TestContainer";
         await db.AddContainerAsync(containerName);
@@ -179,18 +179,18 @@ public void ConfigureServices(IServiceCollection services)
     // For local development and testing
     if (Environment.IsDevelopment())
     {
-        var cosmosDbMock = new InMemoryCosmosDbMock();
-        cosmosDbMock.AddContainerAsync("Users").Wait();
-        services.AddSingleton<ICosmosDbMock>(cosmosDbMock);
+        var cosmosDb = new FakeCosmosDb();
+        cosmosDb.AddContainerAsync("Users").Wait();
+        services.AddSingleton<ICosmosDb>(cosmosDb);
     }
     else
     {
         // For production, use the real CosmosDB
-        services.AddSingleton<ICosmosDbMock>(sp => 
-            new CosmosDbMockAdapter(Configuration.GetConnectionString("CosmosDb")));
+        services.AddSingleton<ICosmosDb>(sp => 
+            new CosmosDbAdapter(Configuration.GetConnectionString("CosmosDb")));
     }
     
-    // Register your services that depend on ICosmosDbMock
+    // Register your services that depend on ICosmosDb
     services.AddScoped<IUserRepository, UserRepository>();
 }
 ```

@@ -1,0 +1,59 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{1FF95A92-A3AD-4FA4-A92C-0434022F7173}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FakeCosmosDb", "src\FakeCosmosDb\FakeCosmosDb.csproj", "{E336379E-3C84-4FFC-A998-D58710029CDC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{170B9409-CD8B-493D-A54F-5DE89CF9536C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FakeCosmosDb.Tests", "tests\FakeCosmosDb.Tests\FakeCosmosDb.Tests.csproj", "{D85CC154-30A9-4676-A17F-24DE7733F94D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionItems", "{8C0F5AE1-D9F5-4BA7-8252-F2DBE0270525}"
+	ProjectSection(SolutionItems) = preProject
+		dev-setup.sh = dev-setup.sh
+		CHANGELOG.md = CHANGELOG.md
+		README.md = README.md
+		LICENSE = LICENSE
+		.tool-versions = .tool-versions
+		.editorconfig = .editorconfig
+		.gitignore = .gitignore
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{C7BBF97A-D452-485C-905E-8157D3B138FF}"
+	ProjectSection(SolutionItems) = preProject
+		docs\DESIGN.md = docs\DESIGN.md
+		docs\gpt-logs.md = docs\gpt-logs.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "adr", "adr", "{55F420AC-8E89-43B0-825C-40A93D8248DD}"
+	ProjectSection(SolutionItems) = preProject
+		docs\adr\0001-use-sprache-for-cosmos-db-sql-parsing.md = docs\adr\0001-use-sprache-for-cosmos-db-sql-parsing.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E336379E-3C84-4FFC-A998-D58710029CDC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E336379E-3C84-4FFC-A998-D58710029CDC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E336379E-3C84-4FFC-A998-D58710029CDC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E336379E-3C84-4FFC-A998-D58710029CDC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D85CC154-30A9-4676-A17F-24DE7733F94D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D85CC154-30A9-4676-A17F-24DE7733F94D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D85CC154-30A9-4676-A17F-24DE7733F94D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D85CC154-30A9-4676-A17F-24DE7733F94D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E336379E-3C84-4FFC-A998-D58710029CDC} = {1FF95A92-A3AD-4FA4-A92C-0434022F7173}
+		{D85CC154-30A9-4676-A17F-24DE7733F94D} = {170B9409-CD8B-493D-A54F-5DE89CF9536C}
+		{C7BBF97A-D452-485C-905E-8157D3B138FF} = {8C0F5AE1-D9F5-4BA7-8252-F2DBE0270525}
+		{55F420AC-8E89-43B0-825C-40A93D8248DD} = {C7BBF97A-D452-485C-905E-8157D3B138FF}
+	EndGlobalSection
+EndGlobal

@@ -1,7 +1,7 @@
 # Design Document: InMemoryCosmosDbMock
 
 ## Overview
-This project provides an **in-memory CosmosDB mock** for unit testing, ensuring high fidelity with real CosmosDB queries while remaining lightweight.
+This project provides an **in-memory Fake CosmosDB** for unit testing, ensuring high fidelity with real CosmosDB queries while remaining lightweight.
 
 ## Architecture
 - **ICosmosDbMock**: Interface for CosmosDB-like behavior  
@@ -16,7 +16,7 @@ This project provides an **in-memory CosmosDB mock** for unit testing, ensuring 
 - GitHub Actions runs **both test modes** in CI
 
 ## CI/CD Pipeline
-- Runs all tests in **both** mock and real CosmosDB modes
+- todo: Runs all tests in **both** fake and real CosmosDB modes
 - Uses **Conventional Commits** to generate **automatic release notes**
 - Supports **Docker-based CosmosDB Emulator** for local testing
 
