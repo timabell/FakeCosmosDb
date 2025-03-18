@@ -179,7 +179,8 @@ public static class CosmosDbSqlGrammar
 	private static readonly Parser<string> ReservedKeyword =
 		Keyword("SELECT").Or(Keyword("FROM")).Or(Keyword("WHERE"))
 			.Or(Keyword("ORDER")).Or(Keyword("BY")).Or(Keyword("LIMIT"))
-			.Or(Keyword("ASC")).Or(Keyword("DESC")).Or(Keyword("AND")).Or(Keyword("OR"));
+			.Or(Keyword("ASC")).Or(Keyword("DESC")).Or(Keyword("AND")).Or(Keyword("OR"))
+			.Or(Keyword("TOP"));
 
 	// Helper extension methods for Optional results
 	private static T GetOrDefault<T>(this IOption<T> option, T defaultValue = default)
@@ -187,13 +188,20 @@ public static class CosmosDbSqlGrammar
 		return option.IsDefined ? option.Get() : defaultValue;
 	}
 
+	// TOP clause parsing
+	private static readonly Parser<TopClause> TopClauseParser =
+		Keyword("TOP").Token().Then(_ =>
+			Parse.Number.Token().Select(value =>
+				new TopClause(int.Parse(value))));
+
 	// SELECT clause parsing
 	private static readonly Parser<SelectClause> SelectClauseParser =
 		Keyword("SELECT").Then(_ =>
-			Parse.Char('*').Token().Select(_ => (IReadOnlyList<SelectItem>)new List<SelectItem> { new SelectAllItem() })
-			.Or(PropertyPath.Token().DelimitedBy(Parse.Char(',').Token())
-				.Select(paths => (IReadOnlyList<SelectItem>)paths.Select(p => (SelectItem)new PropertySelectItem(p)).ToList()))
-			.Select(items => new SelectClause(items)));
+			TopClauseParser.Optional().Then(top =>
+				Parse.Char('*').Token().Select(_ => (IReadOnlyList<SelectItem>)new List<SelectItem> { new SelectAllItem() })
+				.Or(PropertyPath.Token().DelimitedBy(Parse.Char(',').Token())
+					.Select(paths => (IReadOnlyList<SelectItem>)paths.Select(p => (SelectItem)new PropertySelectItem(p)).ToList()))
+				.Select(items => new SelectClause(items, top.GetOrDefault()))));
 
 	// FROM clause parsing
 	private static readonly Parser<FromClause> FromClauseParser =

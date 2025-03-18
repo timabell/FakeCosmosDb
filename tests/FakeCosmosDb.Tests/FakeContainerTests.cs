@@ -595,5 +595,45 @@ namespace TimAbell.FakeCosmosDb.Tests
 			response.Resource["Id"].ToString().Should().Be("mixedCaseTest");
 			response.Resource["partitionKey"].ToString().Should().Be(partitionKeyValue);
 		}
+
+		[Fact]
+		public async Task GetItemQueryIterator_WithTopClause_ShouldLimitResults()
+		{
+			// Arrange
+			var fakeContainer = new FakeContainer(_logger);
+
+			// Add test data
+			for (int i = 1; i <= 10; i++)
+			{
+				var testItem = new JObject
+				{
+					["id"] = i.ToString(),
+					["name"] = $"Test Item {i}",
+					["value"] = i * 10,
+				};
+				fakeContainer.Documents.Add(testItem);
+			}
+
+			// Create a query definition with TOP clause
+			var queryDefinition = new QueryDefinition("SELECT TOP 3 * FROM c ORDER BY c.value");
+
+			// Act
+			var iterator = fakeContainer.GetItemQueryIterator<JObject>(queryDefinition);
+
+			// Assert
+			Assert.NotNull(iterator);
+			Assert.True(iterator.HasMoreResults);
+
+			// Read results from the iterator
+			var response = await iterator.ReadNextAsync();
+
+			// Verify response properties
+			response.Should().HaveCount(3);
+			response.First()["value"].Value<int>().Should().Be(10);
+			response.Last()["value"].Value<int>().Should().Be(30);
+
+			// Verify iterator is now empty (consumed)
+			Assert.False(iterator.HasMoreResults);
+		}
 	}
 }

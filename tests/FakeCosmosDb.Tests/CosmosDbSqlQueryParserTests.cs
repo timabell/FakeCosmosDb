@@ -448,4 +448,26 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		funcExpr.Arguments[0].Should().BeOfType<PropertyExpression>();
 		((PropertyExpression)funcExpr.Arguments[0]).PropertyPath.Should().Be("c.guardian");
 	}
+
+	[Fact]
+	public void ShouldParseTopClause()
+	{
+		// Arrange
+		var sql = "SELECT TOP 1 c.ppmEntityID FROM c WHERE c.id = @id";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.Should().NotBeNull();
+		result.PropertyPaths.Should().HaveCount(1);
+		result.PropertyPaths.Should().Contain("c.ppmEntityID");
+		result.FromName.Should().Be("c");
+		result.TopValue.Should().Be(1);
+
+		// Check WHERE condition
+		result.WhereConditions.Should().HaveCount(1);
+		result.WhereConditions[0].PropertyPath.Should().Be("c.id");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Equals);
+	}
 }

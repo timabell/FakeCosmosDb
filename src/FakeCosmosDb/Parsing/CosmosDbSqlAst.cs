@@ -61,29 +61,47 @@ public class SelectClause
 {
 	public IReadOnlyList<SelectItem> Items { get; }
 	public bool IsSelectAll => Items.Count == 1 && Items[0] is SelectAllItem;
+	public TopClause Top { get; }
 
 	public SelectClause(IReadOnlyList<SelectItem> items)
 	{
 		Items = items;
 	}
 
+	public SelectClause(IReadOnlyList<SelectItem> items, TopClause top)
+	{
+		Items = items;
+		Top = top;
+	}
+
 	public override string ToString()
 	{
+		var result = "SELECT ";
+
+		if (Top != null)
+		{
+			result += $"{Top} ";
+		}
+
 		if (IsSelectAll)
 		{
-			return "SELECT *";
+			result += "*";
 		}
-
-		var propertyPaths = new List<string>();
-		foreach (var item in Items)
+		else
 		{
-			if (item is PropertySelectItem propertyItem)
+			var propertyPaths = new List<string>();
+			foreach (var item in Items)
 			{
-				propertyPaths.Add(propertyItem.PropertyPath);
+				if (item is PropertySelectItem propertyItem)
+				{
+					propertyPaths.Add(propertyItem.PropertyPath);
+				}
 			}
+
+			result += string.Join(", ", propertyPaths);
 		}
 
-		return $"SELECT {string.Join(", ", propertyPaths)}";
+		return result;
 	}
 }
 
@@ -196,6 +214,21 @@ public class LimitClause
 	}
 
 	public override string ToString() => $"LIMIT {Value}";
+}
+
+/// <summary>
+/// Represents a TOP clause in a CosmosDB SQL query.
+/// </summary>
+public class TopClause
+{
+	public int Value { get; }
+
+	public TopClause(int value)
+	{
+		Value = value;
+	}
+
+	public override string ToString() => $"TOP {Value}";
 }
 
 /// <summary>

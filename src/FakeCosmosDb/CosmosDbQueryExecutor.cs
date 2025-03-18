@@ -135,6 +135,26 @@ public class CosmosDbQueryExecutor
 			_logger.LogDebug("After filtering and ordering, got {count} results", results.Count);
 		}
 
+		// Apply TOP if specified
+		if (query.SprachedSqlAst?.Select?.Top != null)
+		{
+			if (_logger != null)
+			{
+				_logger.LogDebug("Applying TOP {top} from AST", query.SprachedSqlAst.Select.Top.Value);
+			}
+
+			results = results.Take(query.SprachedSqlAst.Select.Top.Value).ToList();
+		}
+		else if (query.TopValue > 0)
+		{
+			if (_logger != null)
+			{
+				_logger.LogDebug("Applying TOP {top} from ParsedQuery.TopValue", query.TopValue);
+			}
+
+			results = results.Take(query.TopValue).ToList();
+		}
+
 		// Apply LIMIT if specified
 		if (query.SprachedSqlAst != null && query.SprachedSqlAst.Limit != null)
 		{

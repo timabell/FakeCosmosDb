@@ -52,6 +52,7 @@ public class CosmosDbSqlQueryParser
 			_logger?.LogDebug($"SpracheSqlQueryParser: Legacy ParsedQuery: FromName={result.FromName}, FromAlias={result.FromAlias}");
 			_logger?.LogDebug($"SpracheSqlQueryParser: PropertyPaths={string.Join(", ", result.PropertyPaths)}");
 			_logger?.LogDebug($"SpracheSqlQueryParser: Limit={result.Limit}");
+			_logger?.LogDebug($"SpracheSqlQueryParser: TopValue={result.TopValue}");
 
 			// If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
 			if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
@@ -116,6 +117,7 @@ public class CosmosDbSqlQueryParser
 			}
 
 			sb.AppendLine($"- Limit: {legacyQuery.Limit}");
+			sb.AppendLine($"- TopValue: {legacyQuery.TopValue}");
 
 			return sb.ToString();
 		}
@@ -138,6 +140,12 @@ public class CosmosDbSqlQueryParser
 			FromName = query.From.Source,
 			FromAlias = query.From.Alias
 		};
+
+		// Extract TOP value
+		if (query.Select.Top != null)
+		{
+			result.TopValue = query.Select.Top.Value;
+		}
 
 		// Extract WHERE conditions
 		if (query.Where != null)
@@ -492,6 +500,11 @@ public class ParsedQuery
 	/// LIMIT value, if any.
 	/// </summary>
 	public int Limit { get; set; }
+
+	/// <summary>
+	/// TOP value, if any.
+	/// </summary>
+	public int TopValue { get; set; }
 
 	/// <summary>
 	/// Whether this is a SELECT * query.
