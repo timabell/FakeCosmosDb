@@ -97,7 +97,7 @@ public class CosmosInMemoryCosmosDb : CosmosClient, ICosmosDb
 		return _containers[containerName].QueryWithPaginationAsync(sql, maxItemCount, continuationToken);
 	}
 
-	public Container GetContainer(string databaseName, string containerId)
+	public override Container GetContainer(string databaseName, string containerId)
 	{
 		return new FakeContainer();
 	}
@@ -107,7 +107,7 @@ public class CosmosInMemoryCosmosDb : CosmosClient, ICosmosDb
 		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(databaseName));
 	}
 
-	public Database GetDatabase(string databaseName)
+	public override Database GetDatabase(string databaseName)
 	{
 		return new FakeDatabase(databaseName);
 	}
