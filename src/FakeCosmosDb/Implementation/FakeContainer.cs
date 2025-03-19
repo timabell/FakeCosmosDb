@@ -88,7 +88,19 @@ public class FakeContainer : Container
 
 	public override Task<ItemResponse<T>> CreateItemAsync<T>(T item, PartitionKey? partitionKey = null, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new NotImplementedException();
+		// Convert item to JObject and store it
+		var jObject = JObject.FromObject(item);
+		_store.Add(jObject);
+
+		// Create a response using the FakeItemResponse class
+		var response = new FakeItemResponse<T>(
+			item: item,
+			statusCode: HttpStatusCode.Created,
+			requestCharge: 0,
+			etag: $"\"{Guid.NewGuid().ToString()}\"",
+			headers: new Headers());
+
+		return Task.FromResult<ItemResponse<T>>(response);
 	}
 
 	public override Task<ResponseMessage> ReadItemStreamAsync(string id, PartitionKey partitionKey, ItemRequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
