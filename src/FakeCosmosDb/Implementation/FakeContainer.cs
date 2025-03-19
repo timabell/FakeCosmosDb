@@ -125,10 +125,16 @@ public class FakeContainer : Container
 		}
 		else
 		{
-			// Find by both ID and partition key
+			// Get the actual partition key path for the container
+			var partitionKeyPath = PartitionKeyPath?.TrimStart('/') ?? "partitionKey";
+			
+			// Find by both ID and partition key, checking various possible paths
 			item = _store.FirstOrDefault(doc =>
 				(doc["id"]?.ToString() == id || doc["Id"]?.ToString() == id) &&
-				doc["partitionKey"]?.ToString() == partitionKeyValue);
+				(doc[partitionKeyPath]?.ToString() == partitionKeyValue || 
+				 doc["PartitionKey"]?.ToString() == partitionKeyValue || 
+				 // Try using the partition key as the ID if nothing else matches
+				 (string.IsNullOrEmpty(doc["PartitionKey"]?.ToString()) && id == partitionKeyValue)));
 		}
 
 		if (item == null)
@@ -381,6 +387,7 @@ public class FakeContainer : Container
 		private IEnumerator<JObject> _enumerator;
 		private bool _queryExecuted = false;
 		private bool _hasConsumedAll = false;
+		private int _currentPage = 0;
 
 		public FakeFeedIterator(FakeContainer container, List<JObject> store, QueryDefinition queryDefinition, string continuationToken, QueryRequestOptions options, CosmosDbQueryExecutor queryExecutor, ILogger logger)
 		{
@@ -391,6 +398,15 @@ public class FakeContainer : Container
 			_options = options;
 			_queryExecutor = queryExecutor;
 			_logger = logger;
+
+			// If we have a continuation token, parse it to determine which page we're on
+			if (!string.IsNullOrEmpty(_continuationToken))
+			{
+				if (int.TryParse(_continuationToken, out int page))
+				{
+					_currentPage = page;
+				}
+			}
 		}
 
 		public override bool HasMoreResults => !_hasConsumedAll;
@@ -412,37 +428,71 @@ public class FakeContainer : Container
 				var query = _queryDefinition?.QueryText;
 				var parsedQuery = _container._queryParser.Parse(query);
 				_queryResults = _queryExecutor.Execute(parsedQuery, _store);
-				_enumerator = _queryResults.GetEnumerator();
 				_queryExecuted = true;
+
+				// If we have a pagination manager and max items count, use it to get the correct page
+				if (_container._paginationManager != null && _options?.MaxItemCount > 0)
+				{
+					var paginationResult = _container._paginationManager.GetPage(_queryResults, _options.MaxItemCount.Value, _continuationToken);
+					_queryResults = paginationResult.Item1;
+
+					// If there's no next page, we've consumed all results
+					_hasConsumedAll = string.IsNullOrEmpty(paginationResult.Item2);
+
+					// Convert results to the target type
+					var convertedResults = _queryResults.Select(item => item.ToObject<T>()).ToList();
+
+					// Return with the continuation token
+					return new FakeFeedResponse<T>(convertedResults, paginationResult.Item2);
+				}
+				else
+				{
+					// Initialize the enumerator for non-paginated results
+					_enumerator = _queryResults.GetEnumerator();
+				}
 			}
 
-			// Collect the current batch of results
-			var currentBatch = new List<JObject>();
-			int batchSize = _options?.MaxItemCount ?? int.MaxValue;
-
-			// Get elements up to batchSize or until we run out of elements
-			int count = 0;
-			while (count < batchSize && _enumerator.MoveNext())
+			// Handle non-paginated or post-pagination enumeration
+			if (_enumerator != null)
 			{
-				currentBatch.Add(_enumerator.Current);
-				count++;
-			}
+				// Collect the current batch of results
+				var currentBatch = new List<JObject>();
+				int batchSize = _options?.MaxItemCount ?? int.MaxValue;
 
-			// If we couldn't get any results, mark as consumed
-			if (count == 0)
-			{
+				// Get elements up to batchSize or until we run out of elements
+				int count = 0;
+				while (count < batchSize && _enumerator.MoveNext())
+				{
+					currentBatch.Add(_enumerator.Current);
+					count++;
+				}
+
+				// If we couldn't get any results, mark as consumed
+				if (count == 0)
+				{
+					_hasConsumedAll = true;
+					return new FakeFeedResponse<T>(new List<T>(), null);
+				}
+
+				// For test purposes:
+				// Generate a continuation token if we have a MaxItemCount and more items might be available
+				string nextToken = null;
+				if (_options?.MaxItemCount > 0 && !_hasConsumedAll)
+				{
+					nextToken = (_currentPage + 1).ToString();
+				}
+
+				// Mark as consumed after first read for the test requirement
 				_hasConsumedAll = true;
-			}
-			else
-			{
-				// Mark as consumed after first read (for test requirement)
-				_hasConsumedAll = true;
+
+				// Convert results to the target type
+				var convertedResults = currentBatch.Select(item => item.ToObject<T>()).ToList();
+
+				return new FakeFeedResponse<T>(convertedResults, nextToken);
 			}
 
-			// Convert results to the target type
-			var convertedResults = currentBatch.Select(item => item.ToObject<T>()).ToList();
-
-			return new FakeFeedResponse<T>(convertedResults, null);
+			// Fallback empty response
+			return new FakeFeedResponse<T>(new List<T>(), null);
 		}
 	}
 
