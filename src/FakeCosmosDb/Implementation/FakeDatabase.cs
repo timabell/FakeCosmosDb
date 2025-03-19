@@ -1,19 +1,41 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Fluent;
+using Microsoft.Extensions.Logging;
 
 namespace TimAbell.FakeCosmosDb.Implementation;
 
 public class FakeDatabase : Database
 {
-	public override string Id { get; }
+	public override string Id => _databaseName;
 	public override CosmosClient Client { get; }
 	private readonly string _databaseName;
+	private readonly ILogger _logger;
+	// Dictionary to store containers in this database, keyed by container ID
+	private readonly Dictionary<string, FakeContainer> _containers = new();
 
-	public FakeDatabase(string databaseName)
+	public FakeDatabase(string databaseName, ILogger logger = null)
 	{
 		_databaseName = databaseName;
+		_logger = logger;
+	}
+
+	// Get or create a container in this database
+	public FakeContainer GetOrCreateContainer(string containerId, string partitionKeyPath = "/id")
+	{
+		if (_containers.TryGetValue(containerId, out var existingContainer))
+		{
+			return existingContainer;
+		}
+
+		var newContainer = new FakeContainer(_logger)
+		{
+			PartitionKeyPath = partitionKeyPath
+		};
+		_containers[containerId] = newContainer;
+		return newContainer;
 	}
 
 	public override Task<DatabaseResponse> ReadAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
@@ -73,12 +95,15 @@ public class FakeDatabase : Database
 
 	public override Container GetContainer(string id)
 	{
-		throw new System.NotImplementedException();
+		return GetOrCreateContainer(id);
 	}
 
 	public override Task<ContainerResponse> CreateContainerAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new System.NotImplementedException();
+		var container = new FakeContainer();
+		_containers[containerProperties.Id] = container;
+		var response = new FakeContainerResponse(container);
+		return Task.FromResult<ContainerResponse>(response);
 	}
 
 	public override Task<ContainerResponse> CreateContainerAsync(string id, string partitionKeyPath, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
@@ -86,9 +111,13 @@ public class FakeDatabase : Database
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override async Task<ContainerResponse> CreateContainerIfNotExistsAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		return Task.FromResult<ContainerResponse>(new FakeContainerResponse());
+		if (!_containers.TryGetValue(containerProperties.Id, out var container))
+		{
+			return await CreateContainerAsync(containerProperties, throughput, requestOptions, cancellationToken);
+		}
+		return new FakeContainerResponse(container);
 	}
 
 	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(string id, string partitionKeyPath, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
@@ -169,4 +198,13 @@ public class FakeDatabase : Database
 
 public class FakeContainerResponse : ContainerResponse
 {
+	private Container _container;
+
+	public FakeContainerResponse(Container container)
+	{
+		_container = container;
+		// StatusCode = HttpStatusCode.Created;
+	}
+
+	public override Container Container => _container;
 }

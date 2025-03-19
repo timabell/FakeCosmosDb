@@ -13,7 +13,8 @@ namespace TimAbell.FakeCosmosDb.SqlParser
 		StringContains,
 		StringStartsWith,
 		IsDefined,
-		ArrayContains
+		ArrayContains,
+		Between
 	}
 
 	public static class ComparisonOperatorExtensions

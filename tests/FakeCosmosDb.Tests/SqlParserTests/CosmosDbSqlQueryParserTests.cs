@@ -138,6 +138,44 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	}
 
 	[Fact]
+	public void ShouldParseContainsFunctionWithCaseInsensitiveParameter()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE CONTAINS(c.name, 'John', false)";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+		result.WhereConditions.Should().HaveCount(1);
+		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
+		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
+		result.WhereConditions[0].IgnoreCase.Should().BeFalse();
+	}
+
+	[Fact]
+	public void ShouldParseContainsFunctionWithCaseSensitiveParameter()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE CONTAINS(c.name, 'John', true)";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+		result.WhereConditions.Should().HaveCount(1);
+		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
+		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
+		result.WhereConditions[0].IgnoreCase.Should().BeTrue();
+	}
+
+	[Fact]
 	public void ShouldParseStartsWithFunction()
 	{
 		// Arrange
@@ -153,6 +191,82 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
 		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringStartsWith);
 		result.WhereConditions[0].Value.Value<string>().Should().Be("J");
+	}
+
+	[Fact]
+	public void ShouldParseBetweenFloatOperator()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE c.age BETWEEN 18.8 AND 65.9";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+
+		// BETWEEN is represented as a single condition with an array of bounds
+		result.WhereConditions.Should().HaveCount(1);
+
+		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Between);
+
+		// The value should be an array with lower and upper bounds
+		result.WhereConditions[0].Value.Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Array);
+		result.WhereConditions[0].Value[0].Value<double>().Should().Be(18.8); // Lower bound
+		result.WhereConditions[0].Value[1].Value<double>().Should().Be(65.9); // Upper bound
+	}
+
+
+	[Fact]
+	public void ShouldParseBetweenIntOperator()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE c.age BETWEEN 18 AND 65";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+
+		// BETWEEN is represented as a single condition with an array of bounds
+		result.WhereConditions.Should().HaveCount(1);
+
+		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Between);
+
+		// The value should be an array with lower and upper bounds
+		result.WhereConditions[0].Value.Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Array);
+		result.WhereConditions[0].Value[0].Value<int>().Should().Be(18); // Lower bound
+		result.WhereConditions[0].Value[1].Value<int>().Should().Be(65); // Upper bound
+	}
+
+	[Fact]
+	public void ShouldParseBetweenStringOperator()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE c.name BETWEEN 'A' AND 'M'";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+
+		// BETWEEN is represented as a single condition with an array of bounds
+		result.WhereConditions.Should().HaveCount(1);
+
+		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Between);
+
+		// The value should be an array with lower and upper bounds
+		result.WhereConditions[0].Value.Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Array);
+		result.WhereConditions[0].Value[0].Value<string>().Should().Be("A"); // Lower bound
+		result.WhereConditions[0].Value[1].Value<string>().Should().Be("M"); // Upper bound
 	}
 
 	[Fact]

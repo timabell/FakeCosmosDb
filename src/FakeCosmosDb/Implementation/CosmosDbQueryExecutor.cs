@@ -220,10 +220,10 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Checking {property} {operator} {value}",
 					condition.PropertyPath, condition.Operator, condition.Value);
 				_logger.LogDebug("Document property value: {value} (Type: {type})",
-					propertyValue?.ToString() ?? "null", propertyValue?.Type.ToString() ?? "null");
+					propertyValue?.ToString() ?? "null", propertyValue != null ? propertyValue.Type.ToString() : "null");
 			}
 
-			var matches = EvaluateCondition(propertyValue, condition.Operator, condition.Value);
+			var matches = EvaluateCondition(propertyValue, condition.Operator, condition.Value, condition.IgnoreCase ?? false);
 			if (_logger != null)
 			{
 				_logger.LogDebug("Condition result: {result}", matches);
@@ -238,7 +238,7 @@ public class CosmosDbQueryExecutor
 		return true;
 	}
 
-	private bool EvaluateCondition(JToken propertyValue, ComparisonOperator op, JToken conditionValue)
+	private bool EvaluateCondition(JToken propertyValue, ComparisonOperator op, JToken conditionValue, bool ignoreCase)
 	{
 		// Handle null property values
 		if (propertyValue == null)
@@ -318,6 +318,10 @@ public class CosmosDbQueryExecutor
 				return equality;
 
 			case ComparisonOperator.NotEquals:
+				if (conditionObj is JToken jToken)
+				{
+					return !JToken.DeepEquals(propertyValue, jToken);
+				}
 				return !JToken.DeepEquals(propertyValue, JToken.FromObject(conditionObj));
 
 			case ComparisonOperator.GreaterThan:
@@ -333,12 +337,26 @@ public class CosmosDbQueryExecutor
 				return CompareValues(propertyValue, conditionObj) <= 0;
 
 			case ComparisonOperator.StringContains:
-				if (propertyValue.Type == JTokenType.String && conditionObj is string containsValue)
+				var containsPropertyValue = propertyValue?.ToString();
+				var containsSearchValue = conditionObj?.ToString();
+
+				if (containsPropertyValue == null || containsSearchValue == null)
 				{
-					return propertyValue.Value<string>().IndexOf(containsValue, StringComparison.OrdinalIgnoreCase) >= 0;
+					_logger?.LogDebug("String contains comparison: one of the values is null");
+					return false;
 				}
 
-				return false;
+				var containsResult = ignoreCase
+					? containsPropertyValue.IndexOf(containsSearchValue, StringComparison.OrdinalIgnoreCase) >= 0
+					: containsPropertyValue.Contains(containsSearchValue);
+
+				if (_logger != null)
+				{
+					_logger.LogDebug("String contains comparison: '{left}' contains '{right}' (ignoreCase: {ignoreCase}) = {result}",
+						containsPropertyValue, containsSearchValue, ignoreCase, containsResult);
+				}
+
+				return containsResult;
 
 			case ComparisonOperator.StringStartsWith:
 				if (propertyValue.Type == JTokenType.String && conditionObj is string startsWithValue)
@@ -380,6 +398,56 @@ public class CosmosDbQueryExecutor
 
 				// If propValue is not an array, return false
 				return false;
+
+			case ComparisonOperator.Between:
+				if (conditionObj is not JArray arrayBetween)
+				{
+					throw new InvalidOperationException("BETWEEN operator requires an array of values");
+				}
+
+				if (arrayBetween.Count != 2)
+				{
+					throw new InvalidOperationException($"BETWEEN operator requires exactly 2 values, but found {arrayBetween.Count}");
+				}
+
+				// Extract the values to compare against
+				var lowerBound = arrayBetween[0];
+				var upperBound = arrayBetween[1];
+
+				// Get the property value as a JToken if it's not already
+				JToken jPropertyValue = propertyValue as JToken ?? JToken.FromObject(propertyValue);
+
+				// Handle different types of JToken values
+				if (jPropertyValue.Type == JTokenType.Integer)
+				{
+					int value = jPropertyValue.Value<int>();
+					return value >= lowerBound.Value<int>() && value <= upperBound.Value<int>();
+				}
+				else if (jPropertyValue.Type == JTokenType.Float)
+				{
+					double value = jPropertyValue.Value<double>();
+					return value >= lowerBound.Value<double>() && value <= upperBound.Value<double>();
+				}
+				else if (jPropertyValue.Type == JTokenType.Date)
+				{
+					DateTime value = jPropertyValue.Value<DateTime>();
+					return value >= lowerBound.Value<DateTime>() && value <= upperBound.Value<DateTime>();
+				}
+				else if (jPropertyValue.Type == JTokenType.String)
+				{
+					string value = jPropertyValue.Value<string>();
+					string lowerStr = lowerBound.ToString();
+					string upperStr = upperBound.ToString();
+					return string.Compare(value, lowerStr) >= 0 && string.Compare(value, upperStr) <= 0;
+				}
+				else
+				{
+					// For other types, try converting to string and compare
+					string value = jPropertyValue.ToString();
+					string lowerStr = lowerBound.ToString();
+					string upperStr = upperBound.ToString();
+					return string.Compare(value, lowerStr) >= 0 && string.Compare(value, upperStr) <= 0;
+				}
 
 			default:
 				if (_logger != null)
@@ -640,7 +708,7 @@ public class CosmosDbQueryExecutor
 		{
 			boolResult = b;
 		}
-		else if (result != null)
+		else if (result is object) // Changed from result != null to resolve warning
 		{
 			boolResult = Convert.ToBoolean(result);
 		}
@@ -665,7 +733,7 @@ public class CosmosDbQueryExecutor
 		{
 			var propValue = GetPropertyValue(item, condition.PropertyPath);
 
-			// For string comparisons, we might need to handle the stored JToken format 
+			// For string comparisons, we might need to handle the stored JToken format
 			if (!CompareCondition(propValue, condition.Operator, condition.Value))
 			{
 				return false;
@@ -745,15 +813,22 @@ public class CosmosDbQueryExecutor
 			switch (operatorEnum)
 			{
 				case ComparisonOperator.Equals:
-					return string.Equals(propString, valueString, StringComparison.OrdinalIgnoreCase);
+					return string.Equals(propString, valueString, StringComparison.Ordinal);
 				case ComparisonOperator.NotEquals:
-					return !string.Equals(propString, valueString, StringComparison.OrdinalIgnoreCase);
+					return !string.Equals(propString, valueString, StringComparison.Ordinal);
 				case ComparisonOperator.StringContains:
-					return propString.IndexOf(valueString, StringComparison.OrdinalIgnoreCase) >= 0;
+					bool ignoreCase = false;
+					if (conditionValue.Type == JTokenType.Boolean)
+					{
+						ignoreCase = conditionValue.Value<bool>();
+					}
+					return propString.Contains(valueString, ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 				case ComparisonOperator.StringStartsWith:
-					return propString.StartsWith(valueString, StringComparison.OrdinalIgnoreCase);
+					return propString.StartsWith(valueString, StringComparison.Ordinal);
 				default:
-					throw new NotImplementedException($"String operator {operatorEnum} not implemented");
+					// For other string comparisons, use string.Compare
+					int comparison = string.Compare(propString, valueString, StringComparison.Ordinal);
+					return GetComparisonResult(comparison, operatorEnum);
 			}
 		}
 
@@ -779,23 +854,7 @@ public class CosmosDbQueryExecutor
 			}
 
 			int comparison = comparable.CompareTo(value);
-			switch (operatorEnum)
-			{
-				case ComparisonOperator.Equals:
-					return comparison == 0;
-				case ComparisonOperator.NotEquals:
-					return comparison != 0;
-				case ComparisonOperator.GreaterThan:
-					return comparison > 0;
-				case ComparisonOperator.GreaterThanOrEqual:
-					return comparison >= 0;
-				case ComparisonOperator.LessThan:
-					return comparison < 0;
-				case ComparisonOperator.LessThanOrEqual:
-					return comparison <= 0;
-				default:
-					throw new NotImplementedException($"Operator {operatorEnum} not implemented for numeric comparison");
-			}
+			return GetComparisonResult(comparison, operatorEnum);
 		}
 
 		// For boolean values
@@ -808,50 +867,33 @@ public class CosmosDbQueryExecutor
 				case ComparisonOperator.NotEquals:
 					return propBool != valueBool;
 				default:
-					throw new NotImplementedException($"Operator {operatorEnum} not implemented for boolean comparison");
+					return false; // Other comparisons don't make sense for booleans
 			}
 		}
 
-		return false;
+		// If we can't compare properly, default to equality check
+		return propValue.Equals(value);
 	}
 
-	private bool CompareCondition(JToken propertyValue, JToken conditionValue, ComparisonOperator operatorEnum)
+	private bool GetComparisonResult(int comparison, ComparisonOperator operatorEnum)
 	{
-		// Extract primitive values for comparison
-		object propValue = propertyValue?.Value<object>();
-		object conditionObj = null;
-		if (conditionValue != null)
+		switch (operatorEnum)
 		{
-			// Extract primitive value from JToken
-			switch (conditionValue.Type)
-			{
-				case JTokenType.String:
-					conditionObj = conditionValue.Value<string>();
-					break;
-				case JTokenType.Integer:
-					conditionObj = conditionValue.Value<int>();
-					break;
-				case JTokenType.Float:
-					conditionObj = conditionValue.Value<double>();
-					break;
-				case JTokenType.Boolean:
-					conditionObj = conditionValue.Value<bool>();
-					break;
-				default:
-					conditionObj = conditionValue.ToString();
-					break;
-			}
-
-			if (_logger != null)
-			{
-				_logger.LogDebug("Extracted condition value: {value} (Type: {type})",
-					conditionObj, conditionObj?.GetType().Name ?? "null");
-				_logger.LogDebug("Property value for comparison: {value} (Type: {type})",
-					propertyValue.ToString(), propertyValue.Type.ToString());
-			}
+			case ComparisonOperator.Equals:
+				return comparison == 0;
+			case ComparisonOperator.NotEquals:
+				return comparison != 0;
+			case ComparisonOperator.GreaterThan:
+				return comparison > 0;
+			case ComparisonOperator.GreaterThanOrEqual:
+				return comparison >= 0;
+			case ComparisonOperator.LessThan:
+				return comparison < 0;
+			case ComparisonOperator.LessThanOrEqual:
+				return comparison <= 0;
+			default:
+				throw new NotImplementedException($"Operator {operatorEnum} not implemented for comparison");
 		}
-
-		return CompareValues(propValue, conditionObj, operatorEnum);
 	}
 
 	private bool CompareValues(object propValue, object value, ComparisonOperator operatorEnum)
@@ -896,24 +938,8 @@ public class CosmosDbQueryExecutor
 		// For string values
 		if (propValue is string strPropValue && value is string strValue)
 		{
-			int comparison = string.Compare(strPropValue, strValue, StringComparison.OrdinalIgnoreCase);
-			switch (operatorEnum)
-			{
-				case ComparisonOperator.Equals:
-					return comparison == 0;
-				case ComparisonOperator.NotEquals:
-					return comparison != 0;
-				case ComparisonOperator.GreaterThan:
-					return comparison > 0;
-				case ComparisonOperator.GreaterThanOrEqual:
-					return comparison >= 0;
-				case ComparisonOperator.LessThan:
-					return comparison < 0;
-				case ComparisonOperator.LessThanOrEqual:
-					return comparison <= 0;
-				default:
-					throw new NotImplementedException($"Operator {operatorEnum} not implemented for string comparison");
-			}
+			int comparison = string.Compare(strPropValue, strValue, StringComparison.Ordinal);
+			return GetComparisonResult(comparison, operatorEnum);
 		}
 
 		// For numeric comparisons
@@ -938,36 +964,20 @@ public class CosmosDbQueryExecutor
 			}
 
 			int comparison = comparable.CompareTo(value);
-			switch (operatorEnum)
-			{
-				case ComparisonOperator.Equals:
-					return comparison == 0;
-				case ComparisonOperator.NotEquals:
-					return comparison != 0;
-				case ComparisonOperator.GreaterThan:
-					return comparison > 0;
-				case ComparisonOperator.GreaterThanOrEqual:
-					return comparison >= 0;
-				case ComparisonOperator.LessThan:
-					return comparison < 0;
-				case ComparisonOperator.LessThanOrEqual:
-					return comparison <= 0;
-				default:
-					throw new NotImplementedException($"Operator {operatorEnum} not implemented for numeric comparison");
-			}
+			return GetComparisonResult(comparison, operatorEnum);
 		}
 
 		// For boolean values
-		if (propValue is bool boolPropValue && value is bool boolValue)
+		if (propValue is bool propBool && value is bool valueBool)
 		{
 			switch (operatorEnum)
 			{
 				case ComparisonOperator.Equals:
-					return boolPropValue == boolValue;
+					return propBool == valueBool;
 				case ComparisonOperator.NotEquals:
-					return boolPropValue != boolValue;
+					return propBool != valueBool;
 				default:
-					throw new NotImplementedException($"Operator {operatorEnum} not implemented for boolean comparison");
+					return false; // Other comparisons don't make sense for booleans
 			}
 		}
 
@@ -977,24 +987,8 @@ public class CosmosDbQueryExecutor
 
 	private bool CompareStringValues(string left, string right, ComparisonOperator operatorEnum)
 	{
-		int comparison = string.Compare(left, right, StringComparison.OrdinalIgnoreCase);
-		switch (operatorEnum)
-		{
-			case ComparisonOperator.Equals:
-				return comparison == 0;
-			case ComparisonOperator.NotEquals:
-				return comparison != 0;
-			case ComparisonOperator.GreaterThan:
-				return comparison > 0;
-			case ComparisonOperator.GreaterThanOrEqual:
-				return comparison >= 0;
-			case ComparisonOperator.LessThan:
-				return comparison < 0;
-			case ComparisonOperator.LessThanOrEqual:
-				return comparison <= 0;
-			default:
-				throw new NotImplementedException($"Operator {operatorEnum} not implemented for string comparison");
-		}
+		int comparison = string.Compare(left, right, StringComparison.Ordinal);
+		return GetComparisonResult(comparison, operatorEnum);
 	}
 
 	private bool EvaluateExpression(JObject item, Expression expression)
@@ -1034,7 +1028,7 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("JValue string comparison: '{left}' = '{right}'", leftStr, rightStr);
 							}
-							return string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
+							return string.Equals(leftStr, rightStr, StringComparison.Ordinal);
 						}
 					}
 
@@ -1124,8 +1118,7 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("JValue string not-equals comparison: '{left}' != '{right}'", leftStr, rightStr);
 							}
-
-							return !string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
+							return !string.Equals(leftStr, rightStr, StringComparison.Ordinal);
 						}
 					}
 
@@ -1325,6 +1318,91 @@ public class CosmosDbQueryExecutor
 				case BinaryOperator.Or:
 					return EvaluateExpression(item, binary.Left) || EvaluateExpression(item, binary.Right);
 
+				case BinaryOperator.Between:
+					if (binary.Left is PropertyExpression propExpression && binary.Right is BetweenExpression betweenExpr)
+					{
+						// Get the property value
+						var propValue = GetPropertyValue(item, propExpression.PropertyPath);
+
+						// Convert to JToken if needed
+						JToken jPropValue = propValue as JToken ?? JToken.FromObject(propValue);
+
+						// Get the lower and upper bounds
+						var lowerBound = EvaluateValue(item, betweenExpr.LowerBound);
+						var upperBound = EvaluateValue(item, betweenExpr.UpperBound);
+
+						if (_logger != null)
+						{
+							_logger.LogDebug("Evaluating BETWEEN: {prop} BETWEEN {lower} AND {upper}",
+								jPropValue, lowerBound, upperBound);
+						}
+
+						// Direct implementation of BETWEEN logic instead of using EvaluateCondition
+						// This avoids potential issues with JArray serialization
+
+						// Extract numeric values for comparison
+						if (jPropValue.Type == JTokenType.Integer || jPropValue.Type == JTokenType.Float)
+						{
+							double propNum = jPropValue.Value<double>();
+							double lowerNum = lowerBound is JToken jLower ? jLower.Value<double>() : Convert.ToDouble(lowerBound);
+							double upperNum = upperBound is JToken jUpper ? jUpper.Value<double>() : Convert.ToDouble(upperBound);
+
+							if (_logger != null)
+							{
+								_logger.LogDebug("Numeric BETWEEN comparison: {lower} <= {value} <= {upper}",
+									lowerNum, propNum, upperNum);
+							}
+
+							return lowerNum <= propNum && propNum <= upperNum;
+						}
+						else if (jPropValue.Type == JTokenType.Date)
+						{
+							DateTime propDate = jPropValue.Value<DateTime>();
+							DateTime lowerDate = lowerBound is JToken jLower ? jLower.Value<DateTime>() : Convert.ToDateTime(lowerBound);
+							DateTime upperDate = upperBound is JToken jUpper ? jUpper.Value<DateTime>() : Convert.ToDateTime(upperBound);
+
+							if (_logger != null)
+							{
+								_logger.LogDebug("DateTime BETWEEN comparison: {lower} <= {value} <= {upper}",
+									lowerDate, propDate, upperDate);
+							}
+
+							return lowerDate <= propDate && propDate <= upperDate;
+						}
+						else if (jPropValue.Type == JTokenType.String)
+						{
+							string propStr = jPropValue.Value<string>();
+							string lowerStr = lowerBound is JToken jLower ? jLower.Value<string>() : Convert.ToString(lowerBound);
+							string upperStr = upperBound is JToken jUpper ? jUpper.Value<string>() : Convert.ToString(upperBound);
+
+							if (_logger != null)
+							{
+								_logger.LogDebug("String BETWEEN comparison: {lower} <= {value} <= {upper}",
+									lowerStr, propStr, upperStr);
+							}
+
+							return string.Compare(lowerStr, propStr, false) <= 0 &&
+								   string.Compare(propStr, upperStr, false) <= 0;
+						}
+						else
+						{
+							// For other types, convert to string and compare
+							string propStr = jPropValue.ToString();
+							string lowerStr = lowerBound?.ToString() ?? string.Empty;
+							string upperStr = upperBound?.ToString() ?? string.Empty;
+
+							if (_logger != null)
+							{
+								_logger.LogDebug("String fallback BETWEEN comparison: {lower} <= {value} <= {upper}",
+									lowerStr, propStr, upperStr);
+							}
+
+							return string.Compare(lowerStr, propStr, false) <= 0 &&
+								   string.Compare(propStr, upperStr, false) <= 0;
+						}
+					}
+					return false;
+
 				default:
 					throw new NotImplementedException($"Operator {binary.Operator} not implemented");
 			}
@@ -1460,6 +1538,22 @@ public class CosmosDbQueryExecutor
 			return result;
 		}
 
+		if (expression is BetweenExpression betweenExpression)
+		{
+			// For a BetweenExpression, return an array with the lower and upper bounds
+			var lowerBound = EvaluateValue(item, betweenExpression.LowerBound);
+			var upperBound = EvaluateValue(item, betweenExpression.UpperBound);
+
+			if (_logger != null)
+			{
+				_logger.LogDebug("BetweenExpression bounds: [{lower}, {upper}]",
+					lowerBound?.ToString() ?? "null",
+					upperBound?.ToString() ?? "null");
+			}
+
+			return new JArray(lowerBound, upperBound);
+		}
+
 		throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
 	}
 
@@ -1473,20 +1567,35 @@ public class CosmosDbQueryExecutor
 		switch (function.Name.ToUpperInvariant())
 		{
 			case "CONTAINS":
-				if (function.Arguments.Count != 2)
+				if (function.Arguments.Count < 2 || function.Arguments.Count > 3)
 				{
-					throw new ArgumentException("CONTAINS function requires exactly 2 arguments");
+					throw new ArgumentException("CONTAINS function requires 2 or 3 arguments");
 				}
 
 				var containsPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
 				var containsSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+
+				// Third argument is an optional boolean for case insensitivity
+				// When set to true, CONTAINS performs a case-insensitive search
+				// When unspecified, this value defaults to false (case-sensitive)
+				var ignoreCase = false;
+				if (function.Arguments.Count == 3)
+				{
+					var caseInsensitiveArg = EvaluateValue(item, function.Arguments[2]);
+					if (caseInsensitiveArg != null && bool.TryParse(caseInsensitiveArg.ToString(), out bool ignoreResult))
+					{
+						ignoreCase = ignoreResult;
+					}
+				}
 
 				if (containsPropertyValue == null || containsSearchValue == null)
 				{
 					return false;
 				}
 
-				return containsPropertyValue.Contains(containsSearchValue);
+				return ignoreCase
+					? containsPropertyValue.IndexOf(containsSearchValue, StringComparison.OrdinalIgnoreCase) >= 0
+					: containsPropertyValue.Contains(containsSearchValue);
 
 			case "STARTSWITH":
 				if (function.Arguments.Count != 2)

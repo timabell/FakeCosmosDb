@@ -14,11 +14,16 @@ namespace TimAbell.FakeCosmosDb;
 /// </summary>
 public interface ICosmosDb
 {
-	Task AddContainerAsync(string containerName);
-	Task AddItemAsync(string containerName, object entity);
-	Task<IEnumerable<JObject>> QueryAsync(string containerName, string sql);
-	Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null);
+	Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken());
+	FeedIterator<T> GetDatabaseQueryIterator<T>(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null);
+	FeedIterator<T> GetDatabaseQueryIterator<T>(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null);
+	FeedIterator GetDatabaseQueryStreamIterator(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null);
+	Task<AccountProperties> ReadAccountAsync();
+	FeedIterator GetDatabaseQueryStreamIterator(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null);
+	Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken());
 	Container GetContainer(string databaseName, string containerId);
 	Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default);
 	Database GetDatabase(string databaseName);
+	Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken());
+	Task<DatabaseResponse> CreateDatabaseAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default);
 }

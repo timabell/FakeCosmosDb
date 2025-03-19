@@ -1,5 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos;
+using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;
@@ -8,22 +10,33 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests;
 
 public class CosmosDbAdvancedQueryTests
 {
-	private readonly FakeCosmosDb _db;
-	private readonly string _containerName = "AdvancedQueryTest";
+	private readonly FakeCosmosDb _cosmosDb;
+	private readonly string _databaseName = "AdvancedQueryTestDb";
+	private readonly string _containerName = "AdvancedQueryTestContainer";
 	private readonly ITestOutputHelper _output;
 
 	public CosmosDbAdvancedQueryTests(ITestOutputHelper output)
 	{
 		_output = output;
-		_db = new FakeCosmosDb(new TestLogger(output));
-		_db.AddContainerAsync(_containerName).Wait();
-		SeedTestData().Wait();
+		_cosmosDb = new FakeCosmosDb();
+	}
+
+	private async Task InitializeAsync()
+	{
+		await _cosmosDb.CreateDatabaseIfNotExistsAsync(_databaseName);
+		// Container is already created by GetContainer, no need for CreateIfNotExistsAsync
+	}
+
+	private async Task AddTestItemAsync<T>(T item)
+	{
+		var container = _cosmosDb.GetContainer(_databaseName, _containerName);
+		await container.CreateItemAsync(item);
 	}
 
 	private async Task SeedTestData()
 	{
 		// Add test items with various properties for testing different query functions
-		await _db.AddItemAsync(_containerName, new
+		await AddTestItemAsync(new
 		{
 			id = "1",
 			Name = "John Smith",
@@ -32,7 +45,7 @@ public class CosmosDbAdvancedQueryTests
 			Address = new { City = "New York", ZipCode = "10001" }
 		});
 
-		await _db.AddItemAsync(_containerName, new
+		await AddTestItemAsync(new
 		{
 			id = "2",
 			Name = "Jane Doe",
@@ -41,7 +54,7 @@ public class CosmosDbAdvancedQueryTests
 			Address = new { City = "Los Angeles", ZipCode = "90001" }
 		});
 
-		await _db.AddItemAsync(_containerName, new
+		await AddTestItemAsync(new
 		{
 			id = "3",
 			Name = "Bob Johnson",
@@ -50,7 +63,7 @@ public class CosmosDbAdvancedQueryTests
 			Address = new { City = "Chicago", ZipCode = "60601" }
 		});
 
-		await _db.AddItemAsync(_containerName, new
+		await AddTestItemAsync(new
 		{
 			id = "4",
 			Name = "Alice Brown",
@@ -63,58 +76,88 @@ public class CosmosDbAdvancedQueryTests
 	[Fact]
 	public async Task Query_WithContains_ReturnsCorrectItems()
 	{
+		await InitializeAsync();
+		await SeedTestData();
+
 		// Query using CONTAINS function
-		var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE CONTAINS(c.Name, 'oh')");
+		var container = _cosmosDb.GetContainer(_databaseName, _containerName);
+		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE CONTAINS(c.Name, 'oh')");
+		var iterator = container.GetItemQueryIterator<JObject>(queryDefinition);
+		var response = await iterator.ReadNextAsync();
 
 		// Should match "John Smith" and "Bob Johnson"
-		Assert.Equal(2, results.Count());
-		Assert.Contains(results, item => item["Name"].ToString() == "John Smith");
-		Assert.Contains(results, item => item["Name"].ToString() == "Bob Johnson");
+		Assert.Equal(2, response.Count);
+		Assert.Contains(response, item => item["Name"].ToString() == "John Smith");
+		Assert.Contains(response, item => item["Name"].ToString() == "Bob Johnson");
 	}
 
 	[Fact]
 	public async Task Query_WithStartsWith_ReturnsCorrectItems()
 	{
+		await InitializeAsync();
+		await SeedTestData();
+
 		// Query using STARTSWITH function
-		var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE STARTSWITH(c.Name, 'J')");
+		var container = _cosmosDb.GetContainer(_databaseName, _containerName);
+		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE STARTSWITH(c.Name, 'J')");
+		var iterator = container.GetItemQueryIterator<JObject>(queryDefinition);
+		var response = await iterator.ReadNextAsync();
 
 		// Should match "John Smith" and "Jane Doe"
-		Assert.Equal(2, results.Count());
-		Assert.Contains(results, item => item["Name"].ToString() == "John Smith");
-		Assert.Contains(results, item => item["Name"].ToString() == "Jane Doe");
+		Assert.Equal(2, response.Count);
+		Assert.Contains(response, item => item["Name"].ToString() == "John Smith");
+		Assert.Contains(response, item => item["Name"].ToString() == "Jane Doe");
 	}
 
 	[Fact]
 	public async Task Query_WithGreaterThan_ReturnsCorrectItems()
 	{
+		await InitializeAsync();
+		await SeedTestData();
+
 		// Query using greater than comparison
-		var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE c.Age > 30");
+		var container = _cosmosDb.GetContainer(_databaseName, _containerName);
+		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.Age > 30");
+		var iterator = container.GetItemQueryIterator<JObject>(queryDefinition);
+		var response = await iterator.ReadNextAsync();
 
 		// Should match "Bob Johnson" (40) and "Alice Brown" (35)
-		Assert.Equal(2, results.Count());
-		Assert.Contains(results, item => item["Name"].ToString() == "Bob Johnson");
-		Assert.Contains(results, item => item["Name"].ToString() == "Alice Brown");
+		Assert.Equal(2, response.Count);
+		Assert.Contains(response, item => item["Name"].ToString() == "Bob Johnson");
+		Assert.Contains(response, item => item["Name"].ToString() == "Alice Brown");
 	}
 
 	[Fact]
 	public async Task Query_WithLessThan_ReturnsCorrectItems()
 	{
+		await InitializeAsync();
+		await SeedTestData();
+
 		// Query using less than comparison
-		var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE c.Age < 30");
+		var container = _cosmosDb.GetContainer(_databaseName, _containerName);
+		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.Age < 30");
+		var iterator = container.GetItemQueryIterator<JObject>(queryDefinition);
+		var response = await iterator.ReadNextAsync();
 
 		// Should match "Jane Doe" (25)
-		Assert.Single(results);
-		Assert.Equal("Jane Doe", results.First()["Name"].ToString());
+		Assert.Single(response);
+		Assert.Equal("Jane Doe", response.First()["Name"].ToString());
 	}
 
 	[Fact]
 	public async Task Query_WithNestedProperty_ReturnsCorrectItems()
 	{
+		await InitializeAsync();
+		await SeedTestData();
+
 		// Query using a nested property
-		var results = await _db.QueryAsync(_containerName, "SELECT * FROM c WHERE c.Address.City = 'Chicago'");
+		var container = _cosmosDb.GetContainer(_databaseName, _containerName);
+		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.Address.City = 'Chicago'");
+		var iterator = container.GetItemQueryIterator<JObject>(queryDefinition);
+		var response = await iterator.ReadNextAsync();
 
 		// Should match "Bob Johnson"
-		Assert.Single(results);
-		Assert.Equal("Bob Johnson", results.First()["Name"].ToString());
+		Assert.Single(response);
+		Assert.Equal("Bob Johnson", response.First()["Name"].ToString());
 	}
 }

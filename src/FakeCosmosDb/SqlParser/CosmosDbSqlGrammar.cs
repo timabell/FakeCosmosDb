@@ -116,6 +116,27 @@ public static class CosmosDbSqlGrammar
 	// Forward reference for expression parser (to handle recursion)
 	private static readonly Parser<Expression> ExpressionRef = Parse.Ref(() => ExpressionParser);
 
+	// Forward reference for term expression parser to break circular dependency
+	private static readonly Parser<Expression> TermExprRef = Parse.Ref(() => TermExpr);
+
+	// BETWEEN operator parser - using the forward reference to avoid circular dependency
+	private static readonly Parser<Expression> BetweenExpr =
+		TermExprRef.Then(left =>
+			Keyword("BETWEEN").Then(_ =>
+				TermExprRef.Then(lower =>
+					Keyword("AND").Then(_ =>
+						TermExprRef.Select(upper =>
+							(Expression)new BinaryExpression(
+								left,
+								BinaryOperator.Between,
+								new BetweenExpression(lower, upper)
+							)
+						)
+					)
+				)
+			)
+		);
+
 	// NOT operator
 	private static readonly Parser<Expression> NotExpr =
 		Keyword("NOT").Token().Then(_ =>
@@ -157,10 +178,11 @@ public static class CosmosDbSqlGrammar
 
 	// Main expression parser with operator precedence
 	private static readonly Parser<Expression> ComparisonExpr =
-		TermExpr.Then(left =>
+		BetweenExpr
+		.Or(TermExpr.Then(left =>
 			ComparisonOperator.Then(op =>
 				TermExpr.Select(right =>
-					(Expression)new BinaryExpression(left, op, right))));
+					(Expression)new BinaryExpression(left, op, right)))));
 
 	private static readonly Parser<Expression> SimpleExpr =
 		ComparisonExpr.Or(TermExpr);

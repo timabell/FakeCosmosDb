@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Xunit.Abstractions;
@@ -10,6 +11,10 @@ public class CosmosDbTestFixture : IDisposable
 	public ICosmosDb Db { get; }
 	public string ContainerName = "TestContainer";
 	private readonly ILogger _logger;
+	private readonly string TestDatabaseName = "TestDatabase";
+	private readonly string TestContainerName = "TestContainer";
+	private Container _container;
+	private FakeCosmosDb _cosmosDb;
 
 	public CosmosDbTestFixture(bool useRealCosmos, ITestOutputHelper output = null)
 	{
@@ -26,8 +31,13 @@ public class CosmosDbTestFixture : IDisposable
 			// Use In-Memory Mock
 			Db = new FakeCosmosDb(_logger);
 		}
+	}
 
-		Db.AddContainerAsync(ContainerName).Wait();
+	public async Task InitializeAsync()
+	{
+		_cosmosDb = new FakeCosmosDb();
+		var database = await _cosmosDb.CreateDatabaseIfNotExistsAsync(TestDatabaseName);
+		_container = _cosmosDb.GetContainer(TestDatabaseName, TestContainerName);
 	}
 
 	public void Dispose() { /* Cleanup if needed */ }

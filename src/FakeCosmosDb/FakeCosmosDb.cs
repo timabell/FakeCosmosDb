@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.Implementation;
 using TimAbell.FakeCosmosDb.SqlParser;
 
@@ -22,107 +20,97 @@ namespace TimAbell.FakeCosmosDb;
 /// </summary>
 public class FakeCosmosDb : CosmosClient, ICosmosDb
 {
-	private readonly Dictionary<string, FakeContainer> _containers = new();
-	private readonly CosmosDbSqlQueryParser _queryParser;
+	// Dictionary to store databases, keyed by database name
+	private readonly Dictionary<string, FakeDatabase> _databases = new();
+
 	private readonly ILogger _logger;
-	private readonly CosmosDbQueryExecutor _queryExecutor;
-	private readonly ICosmosDbPaginationManager _paginationManager;
 
 	public FakeCosmosDb()
 	{
-		_queryParser = new CosmosDbSqlQueryParser();
-		_queryExecutor = new CosmosDbQueryExecutor();
-		_paginationManager = new CosmosDbPaginationManager();
 	}
 
 	public FakeCosmosDb(ILogger logger)
 	{
 		_logger = logger;
-		_queryParser = new CosmosDbSqlQueryParser(_logger);
-		_queryExecutor = new CosmosDbQueryExecutor(logger);
-		_paginationManager = new CosmosDbPaginationManager();
 	}
 
-	public Task AddContainerAsync(string containerName)
+	// Helper method to get or create a database
+	private FakeDatabase GetOrCreateDatabase(string databaseName)
 	{
-		if (!_containers.ContainsKey(containerName))
-			_containers[containerName] = new FakeContainer(_logger);
-		return Task.CompletedTask;
-	}
-
-	public Task AddItemAsync(string containerName, object entity)
-	{
-		if (!_containers.ContainsKey(containerName))
-			throw new InvalidOperationException($"Container '{containerName}' does not exist.");
-
-		var json = JObject.FromObject(entity);
-		var id = json["id"]?.ToString() ?? throw new InvalidOperationException("Entity must have an 'id' property.");
-		_containers[containerName].Documents.Add(json);
-		return Task.CompletedTask;
-	}
-
-	public Task<IEnumerable<JObject>> QueryAsync(string containerName, string sql)
-	{
-		_logger?.LogDebug("Executing query '{sql}' on container '{containerName}'", sql, containerName);
-
-		try
+		if (_databases.TryGetValue(databaseName, out var existingDatabase))
 		{
-			// Get the container
-			if (!_containers.TryGetValue(containerName, out var container))
-			{
-				_logger?.LogWarning("Container '{containerName}' not found", containerName);
-				throw new InvalidOperationException($"Container '{containerName}' not found");
-			}
-
-			// Parse the query
-			_logger?.LogDebug("Parsing query");
-			var parsedQuery = _queryParser.Parse(sql);
-			_logger?.LogDebug("Query parsed successfully. WhereConditions: {count}",
-				parsedQuery.WhereConditions != null ? parsedQuery.WhereConditions.Count.ToString() : "null");
-
-			// Execute the query
-			_logger?.LogDebug("Executing query against in-memory store");
-			var results = _queryExecutor.Execute(parsedQuery, container.Documents);
-			_logger?.LogDebug("Query execution complete. Results count: {count}", results.Count());
-
-			return Task.FromResult<IEnumerable<JObject>>(results);
+			return existingDatabase;
 		}
-		catch (Exception ex)
-		{
-			_logger?.LogError(ex, "Error executing query: {message}", ex.Message);
-			if (ex.InnerException != null)
-			{
-				_logger?.LogError(ex, "Inner exception: {message}", ex.InnerException.Message);
-			}
 
-			throw;
-		}
+		var newDatabase = new FakeDatabase(databaseName, _logger);
+		_databases[databaseName] = newDatabase;
+		return newDatabase;
 	}
 
-	public Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null)
+	public override Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		if (!_containers.TryGetValue(containerName, out var container))
-			throw new InvalidOperationException($"Container '{containerName}' does not exist.");
+		throw new NotImplementedException();
+	}
 
-		var parsedQuery = _queryParser.Parse(sql);
-		var results = _queryExecutor.Execute(parsedQuery, container.Documents);
-		var (pagedResults, nextToken) = _paginationManager.GetPage(results, maxItemCount, continuationToken);
-		return Task.FromResult((pagedResults, nextToken));
+	public override FeedIterator<T> GetDatabaseQueryIterator<T>(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
+	{
+		throw new NotImplementedException();
+	}
+
+	public override FeedIterator<T> GetDatabaseQueryIterator<T>(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null)
+	{
+		throw new NotImplementedException();
+	}
+
+	public override FeedIterator GetDatabaseQueryStreamIterator(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
+	{
+		throw new NotImplementedException();
+	}
+
+	public override Task<AccountProperties> ReadAccountAsync()
+	{
+		throw new NotImplementedException();
+	}
+
+	public override FeedIterator GetDatabaseQueryStreamIterator(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null)
+	{
+		throw new NotImplementedException();
+	}
+
+	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	{
+		throw new NotImplementedException();
 	}
 
 	public override Container GetContainer(string databaseName, string containerId)
 	{
-		return new FakeContainer(); // todo: connect to stored containers
+		// Get or create the database
+		var database = GetOrCreateDatabase(databaseName);
+
+		// Get or create the container within that database
+		return database.GetOrCreateContainer(containerId);
 	}
 
 	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)
 	{
-		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(databaseName));
+		var database = GetOrCreateDatabase(databaseName);
+		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(database));
 	}
 
 	public override Database GetDatabase(string databaseName)
 	{
-		return new FakeDatabase(databaseName);
+		return GetOrCreateDatabase(databaseName);
+	}
+
+	public override Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	{
+		throw new NotImplementedException();
+	}
+
+	public override Task<DatabaseResponse> CreateDatabaseAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)
+	{
+		var database = GetOrCreateDatabase(databaseName);
+		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(database));
 	}
 
 	protected override void Dispose(bool disposing)
@@ -135,9 +123,10 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 public class FakeDatabaseResponse : DatabaseResponse
 {
-	public FakeDatabaseResponse(string databaseName)
+	public FakeDatabaseResponse(FakeDatabase database)
 	{
-		Database = new FakeDatabase(databaseName);
+		Database = database;
 	}
+
 	public override Database Database { get; }
 }

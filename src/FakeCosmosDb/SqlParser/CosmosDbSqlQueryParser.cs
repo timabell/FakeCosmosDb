@@ -243,12 +243,29 @@ public class CosmosDbSqlQueryParser
 			conditions.AddRange(ExtractWhereConditions(orExpr.Left));
 			// Ignore the right side in an OR condition
 		}
-		// If it's a binary comparison (=, >, <, etc.), convert to a WhereCondition
-		else if (condition is BinaryExpression comparison &&
-				 comparison.Operator != BinaryOperator.And &&
-				 comparison.Operator != BinaryOperator.Or)
+		// If it's a comparison (e.g., Property > Value)
+		if (condition is BinaryExpression comparison)
 		{
-			if (comparison.Left is PropertyExpression leftProp && comparison.Right is ConstantExpression rightConst)
+			// Handle special case for BETWEEN operator
+			if (comparison.Operator == BinaryOperator.Between)
+			{
+				if (comparison.Left is PropertyExpression betweenProp && comparison.Right is BetweenExpression betweenExpr)
+				{
+					// For BETWEEN operator with two constant values
+					if (betweenExpr.LowerBound is ConstantExpression lowerConstExpr &&
+						betweenExpr.UpperBound is ConstantExpression upperConstExpr)
+					{
+						// Create a single BETWEEN condition
+						conditions.Add(new WhereCondition
+						{
+							PropertyPath = betweenProp.PropertyPath,
+							Operator = ComparisonOperator.Between,
+							Value = JToken.FromObject(new object[] { lowerConstExpr.Value, upperConstExpr.Value })
+						});
+					}
+				}
+			}
+			else if (comparison.Left is PropertyExpression leftProp && comparison.Right is ConstantExpression rightConst)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -276,7 +293,7 @@ public class CosmosDbSqlQueryParser
 			string functionName = functionCall.FunctionName.ToUpperInvariant();
 
 			if ((functionName == "CONTAINS" || functionName == "STARTSWITH") &&
-				functionCall.Arguments.Count == 2 &&
+				functionCall.Arguments.Count >= 2 &&
 				functionCall.Arguments[0] is PropertyExpression propExpr &&
 				functionCall.Arguments[1] is ConstantExpression constExpr)
 			{
@@ -284,12 +301,22 @@ public class CosmosDbSqlQueryParser
 					ComparisonOperator.StringContains :
 					ComparisonOperator.StringStartsWith;
 
-				conditions.Add(new WhereCondition
+				var whereCondition = new WhereCondition
 				{
 					PropertyPath = propExpr.PropertyPath,
 					Operator = op,
 					Value = JToken.FromObject(constExpr.Value)
-				});
+				};
+
+				// For CONTAINS with 3 arguments, the third is a boolean for case-insensitivity
+				if (functionName == "CONTAINS" && functionCall.Arguments.Count == 3 &&
+					functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
+					caseInsensitiveArg.Value is bool ignoreCase)
+				{
+					whereCondition.IgnoreCase = ignoreCase;
+				}
+
+				conditions.Add(whereCondition);
 			}
 			else if (functionName == "IS_NULL" &&
 					functionCall.Arguments.Count == 1 &&
@@ -369,7 +396,8 @@ public class CosmosDbSqlQueryParser
 			BinaryOperator.LessThan => ComparisonOperator.LessThan,
 			BinaryOperator.GreaterThanOrEqual => ComparisonOperator.GreaterThanOrEqual,
 			BinaryOperator.LessThanOrEqual => ComparisonOperator.LessThanOrEqual,
-			_ => throw new ArgumentException($"Unsupported operator: {op}")
+			BinaryOperator.Between => ComparisonOperator.Between,
+			_ => throw new NotSupportedException($"Operator '{op}' is not supported in WHERE conditions")
 		};
 	}
 
@@ -531,6 +559,12 @@ public class WhereCondition
 	/// The value to compare with.
 	/// </summary>
 	public JToken Value { get; set; }
+
+	/// <summary>
+	/// For CONTAINS function, indicates whether the search should be case-insensitive.
+	/// When true, the search is case-insensitive. When false or null, the search is case-sensitive.
+	/// </summary>
+	public bool? IgnoreCase { get; set; }
 }
 
 /// <summary>
