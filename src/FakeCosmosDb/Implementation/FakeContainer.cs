@@ -119,9 +119,12 @@ public class FakeContainer : Container
 		if (partitionKey == PartitionKey.None || string.IsNullOrEmpty(partitionKeyValue))
 		{
 			// With empty partition key, just find by ID
-			item = _store.FirstOrDefault(doc =>
-				doc["id"]?.ToString() == id ||
-				doc["Id"]?.ToString() == id);
+			item = _store.FirstOrDefault(doc => {
+				var docId = doc["id"]?.ToString();
+				var docAltId = doc["Id"]?.ToString();
+				return (docId != null && docId.Equals(id, StringComparison.OrdinalIgnoreCase)) || 
+				       (docAltId != null && docAltId.Equals(id, StringComparison.OrdinalIgnoreCase));
+			});
 		}
 		else
 		{
@@ -129,12 +132,32 @@ public class FakeContainer : Container
 			var partitionKeyPath = PartitionKeyPath?.TrimStart('/') ?? "partitionKey";
 			
 			// Find by both ID and partition key, checking various possible paths
-			item = _store.FirstOrDefault(doc =>
-				(doc["id"]?.ToString() == id || doc["Id"]?.ToString() == id) &&
-				(doc[partitionKeyPath]?.ToString() == partitionKeyValue || 
-				 doc["PartitionKey"]?.ToString() == partitionKeyValue || 
-				 // Try using the partition key as the ID if nothing else matches
-				 (string.IsNullOrEmpty(doc["PartitionKey"]?.ToString()) && id == partitionKeyValue)));
+			item = _store.FirstOrDefault(doc => {
+				// Check ID match
+				var idMatches = false;
+				var docId = doc["id"]?.ToString();
+				var docAltId = doc["Id"]?.ToString();
+				
+				if ((docId != null && docId.Equals(id, StringComparison.OrdinalIgnoreCase)) || 
+				    (docAltId != null && docAltId.Equals(id, StringComparison.OrdinalIgnoreCase))) {
+					idMatches = true;
+				}
+				
+				// Check partition key match
+				var pkMatches = false;
+				var docPkPath = doc[partitionKeyPath]?.ToString();
+				var docPk = doc["partitionKey"]?.ToString();
+				var docAltPk = doc["PartitionKey"]?.ToString();
+				
+				if ((docPkPath != null && docPkPath == partitionKeyValue) ||
+					(docPk != null && docPk == partitionKeyValue) ||
+					(docAltPk != null && docAltPk == partitionKeyValue) ||
+					(string.IsNullOrEmpty(docPk) && string.IsNullOrEmpty(docAltPk) && id == partitionKeyValue)) {
+					pkMatches = true;
+				}
+				
+				return idMatches && pkMatches;
+			});
 		}
 
 		if (item == null)
