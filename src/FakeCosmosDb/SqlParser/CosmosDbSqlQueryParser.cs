@@ -309,7 +309,7 @@ public class CosmosDbSqlQueryParser
 				};
 
 				// For CONTAINS with 3 arguments, the third is a boolean for case-insensitivity
-				if (functionName == "CONTAINS" && functionCall.Arguments.Count == 3 && 
+				if (functionName == "CONTAINS" && functionCall.Arguments.Count == 3 &&
 					functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
 					caseInsensitiveArg.Value is bool ignoreCase)
 				{

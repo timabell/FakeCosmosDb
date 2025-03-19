@@ -1323,36 +1323,36 @@ public class CosmosDbQueryExecutor
 					{
 						// Get the property value
 						var propValue = GetPropertyValue(item, propExpression.PropertyPath);
-						
+
 						// Convert to JToken if needed
 						JToken jPropValue = propValue as JToken ?? JToken.FromObject(propValue);
-						
+
 						// Get the lower and upper bounds
 						var lowerBound = EvaluateValue(item, betweenExpr.LowerBound);
 						var upperBound = EvaluateValue(item, betweenExpr.UpperBound);
-						
+
 						if (_logger != null)
 						{
-							_logger.LogDebug("Evaluating BETWEEN: {prop} BETWEEN {lower} AND {upper}", 
+							_logger.LogDebug("Evaluating BETWEEN: {prop} BETWEEN {lower} AND {upper}",
 								jPropValue, lowerBound, upperBound);
 						}
-						
+
 						// Direct implementation of BETWEEN logic instead of using EvaluateCondition
 						// This avoids potential issues with JArray serialization
-						
+
 						// Extract numeric values for comparison
 						if (jPropValue.Type == JTokenType.Integer || jPropValue.Type == JTokenType.Float)
 						{
 							double propNum = jPropValue.Value<double>();
 							double lowerNum = lowerBound is JToken jLower ? jLower.Value<double>() : Convert.ToDouble(lowerBound);
 							double upperNum = upperBound is JToken jUpper ? jUpper.Value<double>() : Convert.ToDouble(upperBound);
-							
+
 							if (_logger != null)
 							{
-								_logger.LogDebug("Numeric BETWEEN comparison: {lower} <= {value} <= {upper}", 
+								_logger.LogDebug("Numeric BETWEEN comparison: {lower} <= {value} <= {upper}",
 									lowerNum, propNum, upperNum);
 							}
-							
+
 							return lowerNum <= propNum && propNum <= upperNum;
 						}
 						else if (jPropValue.Type == JTokenType.Date)
@@ -1360,13 +1360,13 @@ public class CosmosDbQueryExecutor
 							DateTime propDate = jPropValue.Value<DateTime>();
 							DateTime lowerDate = lowerBound is JToken jLower ? jLower.Value<DateTime>() : Convert.ToDateTime(lowerBound);
 							DateTime upperDate = upperBound is JToken jUpper ? jUpper.Value<DateTime>() : Convert.ToDateTime(upperBound);
-							
+
 							if (_logger != null)
 							{
-								_logger.LogDebug("DateTime BETWEEN comparison: {lower} <= {value} <= {upper}", 
+								_logger.LogDebug("DateTime BETWEEN comparison: {lower} <= {value} <= {upper}",
 									lowerDate, propDate, upperDate);
 							}
-							
+
 							return lowerDate <= propDate && propDate <= upperDate;
 						}
 						else if (jPropValue.Type == JTokenType.String)
@@ -1374,14 +1374,14 @@ public class CosmosDbQueryExecutor
 							string propStr = jPropValue.Value<string>();
 							string lowerStr = lowerBound is JToken jLower ? jLower.Value<string>() : Convert.ToString(lowerBound);
 							string upperStr = upperBound is JToken jUpper ? jUpper.Value<string>() : Convert.ToString(upperBound);
-							
+
 							if (_logger != null)
 							{
-								_logger.LogDebug("String BETWEEN comparison: {lower} <= {value} <= {upper}", 
+								_logger.LogDebug("String BETWEEN comparison: {lower} <= {value} <= {upper}",
 									lowerStr, propStr, upperStr);
 							}
-							
-							return string.Compare(lowerStr, propStr, false) <= 0 && 
+
+							return string.Compare(lowerStr, propStr, false) <= 0 &&
 								   string.Compare(propStr, upperStr, false) <= 0;
 						}
 						else
@@ -1390,14 +1390,14 @@ public class CosmosDbQueryExecutor
 							string propStr = jPropValue.ToString();
 							string lowerStr = lowerBound?.ToString() ?? string.Empty;
 							string upperStr = upperBound?.ToString() ?? string.Empty;
-							
+
 							if (_logger != null)
 							{
-								_logger.LogDebug("String fallback BETWEEN comparison: {lower} <= {value} <= {upper}", 
+								_logger.LogDebug("String fallback BETWEEN comparison: {lower} <= {value} <= {upper}",
 									lowerStr, propStr, upperStr);
 							}
-							
-							return string.Compare(lowerStr, propStr, false) <= 0 && 
+
+							return string.Compare(lowerStr, propStr, false) <= 0 &&
 								   string.Compare(propStr, upperStr, false) <= 0;
 						}
 					}
@@ -1543,14 +1543,14 @@ public class CosmosDbQueryExecutor
 			// For a BetweenExpression, return an array with the lower and upper bounds
 			var lowerBound = EvaluateValue(item, betweenExpression.LowerBound);
 			var upperBound = EvaluateValue(item, betweenExpression.UpperBound);
-			
+
 			if (_logger != null)
 			{
-				_logger.LogDebug("BetweenExpression bounds: [{lower}, {upper}]", 
-					lowerBound?.ToString() ?? "null", 
+				_logger.LogDebug("BetweenExpression bounds: [{lower}, {upper}]",
+					lowerBound?.ToString() ?? "null",
 					upperBound?.ToString() ?? "null");
 			}
-			
+
 			return new JArray(lowerBound, upperBound);
 		}
 
@@ -1710,7 +1710,7 @@ public class CosmosDbQueryExecutor
 				var value = EvaluateValue(item, function.Arguments[0]);
 				bool result = value == null;
 
-			 if (_logger != null)
+				if (_logger != null)
 				{
 					_logger.LogDebug("IS_NULL: Value is {result}", result ? "null" : "not null");
 				}
