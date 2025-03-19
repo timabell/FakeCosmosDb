@@ -4,8 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Globalization;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Scripts;
 using Microsoft.Extensions.Logging;
@@ -453,6 +455,14 @@ public class FakeContainer : Container
 			if (!_queryExecuted)
 			{
 				var query = _queryDefinition?.QueryText;
+				
+				// Extract and substitute parameter values in the query text
+				if (_queryDefinition != null)
+				{
+					query = SubstituteQueryParameters(query);
+					_logger?.LogDebug($"Query after parameter substitution: {query}");
+				}
+				
 				var parsedQuery = _container._queryParser.Parse(query);
 				_queryResults = _queryExecutor.Execute(parsedQuery, _store);
 				_queryExecuted = true;
@@ -520,6 +530,96 @@ public class FakeContainer : Container
 
 			// Fallback empty response
 			return new FakeFeedResponse<T>(new List<T>(), null);
+		}
+
+		// Helper method to substitute parameters in the query
+		private string SubstituteQueryParameters(string queryText)
+		{
+			if (_queryDefinition == null || string.IsNullOrEmpty(queryText))
+			{
+				return queryText;
+			}
+
+			// Use reflection to access the private parameters collection in QueryDefinition
+			var queryDefinitionType = _queryDefinition.GetType();
+			var parametersField = queryDefinitionType.GetField("_parameters", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+			
+			if (parametersField == null)
+			{
+				_logger?.LogWarning("Could not access parameters field via reflection");
+				return queryText;
+			}
+
+			var parameters = parametersField.GetValue(_queryDefinition) as System.Collections.IDictionary;
+			
+			if (parameters == null || parameters.Count == 0)
+			{
+				return queryText;
+			}
+
+			string result = queryText;
+			_logger?.LogDebug($"Substituting {parameters.Count} parameters in query");
+
+			// Sort parameters by length (descending) to avoid issues with parameter names that are substrings of others
+			var parameterNames = new List<string>();
+			foreach (var key in parameters.Keys)
+			{
+				parameterNames.Add(key.ToString());
+			}
+			parameterNames.Sort((a, b) => b.Length.CompareTo(a.Length));
+
+			// Substitute each parameter
+			foreach (var paramName in parameterNames)
+			{
+				var paramValue = parameters[paramName];
+				if (paramValue != null)
+				{
+					string replacementValue = GetParameterReplacementString(paramValue);
+					result = result.Replace(paramName, replacementValue);
+					_logger?.LogDebug($"Replaced parameter {paramName} with {replacementValue}");
+				}
+			}
+
+			return result;
+		}
+
+		// Helper method to convert parameter values to SQL-compatible string representations
+		private string GetParameterReplacementString(object value)
+		{
+			if (value == null)
+			{
+				return "null";
+			}
+
+			// Handle different types appropriately
+			if (value is string stringValue)
+			{
+				return $"'{EscapeSqlString(stringValue)}'";
+			}
+			else if (value is DateTime dateTimeValue)
+			{
+				return $"'{dateTimeValue:yyyy-MM-ddTHH:mm:ss.FFFFFFF}'";
+			}
+			else if (value is bool boolValue)
+			{
+				return boolValue ? "true" : "false";
+			}
+			else if (value is decimal || value is double || value is float)
+			{
+				// Ensure decimal point is included for numeric values
+				return Convert.ToString(value, CultureInfo.InvariantCulture);
+			}
+			else
+			{
+				// Handle other types like int, long, etc.
+				return Convert.ToString(value, CultureInfo.InvariantCulture);
+			}
+		}
+
+		// Helper method to escape single quotes in SQL strings
+		private string EscapeSqlString(string input)
+		{
+			return input?.Replace("'", "''");
 		}
 	}
 

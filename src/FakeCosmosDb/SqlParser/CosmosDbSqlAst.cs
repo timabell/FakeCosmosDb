@@ -366,3 +366,18 @@ public class BetweenExpression : Expression
 		return $"BETWEEN {LowerBound} AND {UpperBound}";
 	}
 }
+
+/// <summary>
+/// Represents a parameter reference in a CosmosDB SQL query (e.g., @param).
+/// </summary>
+public class ParameterExpression : Expression
+{
+	public string ParameterName { get; }
+
+	public ParameterExpression(string parameterName)
+	{
+		ParameterName = parameterName;
+	}
+
+	public override string ToString() => ParameterName;
+}
