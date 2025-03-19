@@ -14,7 +14,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionItems", "{8C0F5AE1-D9F5-4BA7-8252-F2DBE0270525}"
 	ProjectSection(SolutionItems) = preProject
 		dev-setup.sh = dev-setup.sh
-		CHANGELOG.md = CHANGELOG.md
 		README.md = README.md
 		LICENSE = LICENSE
 		.tool-versions = .tool-versions
