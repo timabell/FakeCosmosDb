@@ -33,9 +33,9 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			// Container is created by GetContainer, no need for additional calls
 		}
 
-		private async Task AddTestItemAsync<T>(T item)
+		private async Task AddTestItemAsync<T>(T item, string containerName)
 		{
-			var container = _db.GetContainer(_databaseName, _containerName);
+			var container = _db.GetContainer(_databaseName, containerName);
 			await container.CreateItemAsync(item);
 		}
 
@@ -532,28 +532,28 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 				id = "1",
 				Name = "John",
 				CreatedDate = "2025-01-15T00:00:00.000Z"
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "2",
 				Name = "Jane",
 				CreatedDate = "2025-01-01T00:00:00.000Z"
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "3",
 				Name = "Bob",
 				CreatedDate = "2024-12-15T00:00:00.000Z"
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "4",
 				Name = "Alice",
 				CreatedDate = "2024-12-01T00:00:00.000Z"
-			});
+			}, containerName);
 		}
 
 		private async Task SeedTestDataWithDates(string containerName)
@@ -596,28 +596,28 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 				id = "1",
 				Name = "John",
 				FavoriteFoods = new[] { "Pizza", "Burger", "Pasta" }
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "2",
 				Name = "Jane",
 				FavoriteFoods = new[] { "Sushi", "Salad", "Soup" }
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "3",
 				Name = "Bob",
 				FavoriteFoods = new[] { "Pizza", "Tacos", "Steak" }
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "4",
 				Name = "Alice",
 				FavoriteFoods = new[] { "Sushi", "Curry", "Noodles" }
-			});
+			}, containerName);
 		}
 
 		private async Task SeedTestDataWithNestedObjects(string containerName)
@@ -638,7 +638,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 						Zip = "10001"
 					}
 				}
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
@@ -656,7 +656,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 						Zip = "90001"
 					}
 				}
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
@@ -674,7 +674,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 						Zip = "60601"
 					}
 				}
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
@@ -692,7 +692,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 						Zip = "98101"
 					}
 				}
-			});
+			}, containerName);
 		}
 
 		private async Task SeedTestDataWithNullValues(string containerName)
@@ -702,28 +702,28 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 				id = "1",
 				Name = "John",
 				OptionalField = "Value1"
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "2",
 				Name = "Jane",
 				OptionalField = "Value2"
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "3",
 				Name = "Bob",
 				OptionalField = (string)null
-			});
+			}, containerName);
 
 			await AddTestItemAsync(new
 			{
 				id = "4",
 				Name = "Alice",
 				OptionalField = (string)null
-			});
+			}, containerName);
 		}
 
 		private async Task SeedTestDataWithDefinedAndUndefinedFields(string containerName)
