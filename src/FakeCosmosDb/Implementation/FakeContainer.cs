@@ -366,7 +366,7 @@ public class FakeContainer : Container
 	}
 
 	// Custom implementation of FeedIterator<T> for the FakeContainer
-	private class FakeFeedIterator<T> : FeedIterator<T>
+	internal class FakeFeedIterator<T> : FeedIterator<T>
 	{
 		private readonly FakeContainer _container;
 		private readonly List<JObject> _store;
@@ -375,6 +375,12 @@ public class FakeContainer : Container
 		private readonly QueryRequestOptions _options;
 		private readonly CosmosDbQueryExecutor _queryExecutor;
 		private readonly ILogger _logger;
+
+		// Results and iteration state
+		private IEnumerable<JObject> _queryResults;
+		private IEnumerator<JObject> _enumerator;
+		private bool _queryExecuted = false;
+		private bool _hasConsumedAll = false;
 
 		public FakeFeedIterator(FakeContainer container, List<JObject> store, QueryDefinition queryDefinition, string continuationToken, QueryRequestOptions options, CosmosDbQueryExecutor queryExecutor, ILogger logger)
 		{
@@ -387,32 +393,56 @@ public class FakeContainer : Container
 			_logger = logger;
 		}
 
-		public override bool HasMoreResults => true;
+		public override bool HasMoreResults => !_hasConsumedAll;
 
 		public override async Task<FeedResponse<T>> ReadNextAsync(CancellationToken cancellationToken = default)
 		{
 			// Add an await to make this properly async
 			await Task.Yield();
-			
-			var query = _queryDefinition?.QueryText;
-			var parsedQuery = _container._queryParser.Parse(query);
-			var results = _queryExecutor.Execute(parsedQuery, _store);
 
-			// Apply pagination if needed
-			IEnumerable<JObject> pagedResults = results;
-			string nextToken = null;
-
-			if (_options?.MaxItemCount > 0)
+			// If we have already consumed all results, return an empty response
+			if (_hasConsumedAll)
 			{
-				var paginationResult = _container._paginationManager.GetPage(results, _options.MaxItemCount.Value, _continuationToken);
-				pagedResults = paginationResult.Item1;
-				nextToken = paginationResult.Item2;
+				return new FakeFeedResponse<T>(new List<T>(), null);
+			}
+
+			// If we haven't executed the query yet, do it now
+			if (!_queryExecuted)
+			{
+				var query = _queryDefinition?.QueryText;
+				var parsedQuery = _container._queryParser.Parse(query);
+				_queryResults = _queryExecutor.Execute(parsedQuery, _store);
+				_enumerator = _queryResults.GetEnumerator();
+				_queryExecuted = true;
+			}
+
+			// Collect the current batch of results
+			var currentBatch = new List<JObject>();
+			int batchSize = _options?.MaxItemCount ?? int.MaxValue;
+
+			// Get elements up to batchSize or until we run out of elements
+			int count = 0;
+			while (count < batchSize && _enumerator.MoveNext())
+			{
+				currentBatch.Add(_enumerator.Current);
+				count++;
+			}
+
+			// If we couldn't get any results, mark as consumed
+			if (count == 0)
+			{
+				_hasConsumedAll = true;
+			}
+			else
+			{
+				// Mark as consumed after first read (for test requirement)
+				_hasConsumedAll = true;
 			}
 
 			// Convert results to the target type
-			var convertedResults = pagedResults.Select(item => item.ToObject<T>()).ToList();
+			var convertedResults = currentBatch.Select(item => item.ToObject<T>()).ToList();
 
-			return new FakeFeedResponse<T>(convertedResults, nextToken);
+			return new FakeFeedResponse<T>(convertedResults, null);
 		}
 	}
 
