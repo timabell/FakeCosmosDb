@@ -1,204 +1,251 @@
-# Tim Abell FakeCosmosDb
+# TimAbell.FakeCosmosDb - Fake CosmosClientfor Testing
 
-This library provides an **in-memory CosmosDB fake** for unit testing, with optional support for running tests against the **real CosmosDB Emulator**.
+An in-memory implementation of Azure Cosmos DB for testing .NET applications without external dependencies.
 
-## Features
-✅ Supports SQL-like queries (`SELECT * FROM c WHERE c.Name = 'Alice'`)  
-✅ Fully **in-memory**, no dependencies required  
-✅ **Multi-container** support  
-✅ Can switch between **fake mode and real CosmosDB mode**  
-✅ **GitHub Actions CI/CD ready**  
-✅ **Efficient indexing** for fast queries  
-✅ Support for **pagination** with continuation tokens  
-✅ Advanced query features like **CONTAINS**, **STARTSWITH**, and nested properties  
-✅ **SELECT projections** to return only specific fields  
+Will store and round-trip saved data for easy integration testing of code that depends on CosmosDB without having to use the unreliable CosmosDB emulator or depend on the Azure cloud for tests.
+
+The CosmosClient API is non-trivial to implement, so if you want realistic tests you either have to create your own simplisitic abstraction and reduce the quality of your integration test coverage, or depend on the real/emulated CosmosDb from Microsoft that results in slower and less reliable tests requiring significantly more setup infrastructure.
+
+I have created this library as a working starting point for some amount of the CosmosClient API, and hope that by providing this under MIT license to the world that as a community we can turn this into a fairly complete implementation that makes for a realistic test fake to give us fast and useful integration tests for systems that have chosen to use CosmosDB.
+
+It would be better to [not use CosmosDb unless you really need it](https://0x5.uk/2025/01/14/don't-use-azure-cosmosdb/) but we don't always get to choose.
+
+This is a [Fake not a Mock](https://martinfowler.com/articles/mocksArentStubs.html) because it doesn't just give pre-canned responses to API calls, it provides a basic working implementation with in-memory storage that's sufficient for tests.
+
+Using this library also makes it trivial to reset test data state as you can just throw away the instance and new up another one at almost no cost.
+
+## Current Status
+
+This project is under active development with several features implemented and others still in progress:
+
+- ✅ In-memory document storage with container support
+- ✅ SQL query parsing for basic SELECT, WHERE, and ORDER BY operations
+- ✅ Support for common SQL functions (CONTAINS, STARTSWITH, etc.)
+- ✅ Pagination with continuation tokens
+- ✅ Adapter for switching between fake and real Cosmos DB
+- ⚠️ Some advanced query features are partially implemented
+- ❌ Stored procedures not yet supported
+- ❌ Change feed not yet implemented
+
+**Contributions are welcome!** If you encounter missing features or bugs, please open an issue or submit a pull request.
 
 ## Installation
-To use the in-memory CosmosDB fake, install via NuGet:
+
+<https://www.nuget.org/packages/FakeCosmosDb>
 
 ```sh
-dotnet add package # TBC
+dotnet add package FakeCosmosDb
 ```
 
-## Quick Start
+## Usage Examples
+
+### Example 1: Direct Substitution for CosmosClient
 
 ```csharp
-// Create an instance of the fake
-var cosmosDb = new FakeCosmosDb();
-
-// Create a container
-await cosmosDb.AddContainerAsync("Users");
-
-// Add an item
-await cosmosDb.AddItemAsync("Users", new { 
-    id = "1", 
-    Name = "Alice", 
-    Email = "alice@example.com" 
-});
-
-// Query items
-var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE c.Name = 'Alice'");
-
-// Use pagination
-var (pageResults, continuationToken) = await cosmosDb.QueryWithPaginationAsync(
-    "Users", 
-    "SELECT * FROM c", 
-    maxItemCount: 10
-);
-
-// Get the next page using the continuation token
-var (nextPageResults, nextContinuationToken) = await cosmosDb.QueryWithPaginationAsync(
-    "Users", 
-    "SELECT * FROM c", 
-    maxItemCount: 10, 
-    continuationToken: continuationToken
-);
-```
-
-## Advanced Queries
-
-The fake supports a wide range of CosmosDB SQL query features:
-
-### Basic Filtering
-
-```csharp
-// Equality
-var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE c.Name = 'Alice'");
-
-// Numeric comparisons
-var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE c.Age > 30");
-
-// String functions
-var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE CONTAINS(c.Name, 'Ali')");
-var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c WHERE STARTSWITH(c.Email, 'alice')");
-```
-
-### Projections
-
-```csharp
-// Select specific fields
-var results = await cosmosDb.QueryAsync("Users", "SELECT c.Name, c.Email FROM c");
-
-// Select nested properties
-var results = await cosmosDb.QueryAsync("Users", "SELECT c.Name, c.Address.City FROM c");
-```
-
-### Ordering and Limiting
-
-```csharp
-// Order by a field
-var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c ORDER BY c.Name");
-
-// Limit results
-var results = await cosmosDb.QueryAsync("Users", "SELECT * FROM c LIMIT 10");
-```
-
-## Testing with xUnit
-
-### Using the Fake in Tests
-
-```csharp
-public class UserServiceTests
-{
-    private readonly ICosmosDb _db;
-    private readonly UserService _userService;
-
-    public UserServiceTests()
-    {
-        _db = new FakeCosmosDb();
-        _db.AddContainerAsync("Users").Wait();
-        
-        // Inject the fake into your service
-        _userService = new UserService(_db);
-    }
-
-    [Fact]
-    public async Task GetUserByName_ReturnsCorrectUser()
-    {
-        // Arrange
-        await _db.AddItemAsync("Users", new { id = "1", Name = "Alice" });
-        
-        // Act
-        var user = await _userService.GetUserByNameAsync("Alice");
-        
-        // Assert
-        Assert.Equal("Alice", user.Name);
-    }
-}
-```
-
-### Testing with Both Fake and Real CosmosDB
-
-You can run the same tests against both the in-memory fake and the real CosmosDB emulator:
-
-```csharp
-public class CosmosDbTests
-{
-    public static IEnumerable<object[]> TestConfigurations()
-    {
-        yield return new object[] { new FakeCosmosDb() };
-        yield return new object[] { new CosmosDbAdapter("AccountEndpoint=https://localhost:8081;AccountKey=your-key;") };
-    }
-
-    [Theory]
-    [MemberData(nameof(TestConfigurations))]
-    public async Task Can_Insert_And_Query_Item(ICosmosDb db)
-    {
-        var containerName = "TestContainer";
-        await db.AddContainerAsync(containerName);
-
-        var user = new { id = "1", Name = "Alice", Age = 30 };
-        await db.AddItemAsync(containerName, user);
-
-        var results = await db.QueryAsync(containerName, "SELECT * FROM c WHERE c.Name = 'Alice'");
-
-        Assert.Single(results);
-        Assert.Equal("Alice", results.First()["Name"]);
-    }
-}
-```
-
-## Running Tests with the Real CosmosDB Emulator
-To run tests against a **real CosmosDB Emulator**, start the emulator in Docker:
-
-```sh
-docker run -p 8081:8081 -d mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator
-```
-
-Then, run the tests:
-
-```sh
-dotnet test
-```
-
-## Using with Dependency Injection
-
-```csharp
+// Production code in Startup.cs or Program.cs
 public void ConfigureServices(IServiceCollection services)
 {
-    // For local development and testing
-    if (Environment.IsDevelopment())
-    {
-        var cosmosDb = new FakeCosmosDb();
-        cosmosDb.AddContainerAsync("Users").Wait();
-        services.AddSingleton<ICosmosDb>(cosmosDb);
-    }
-    else
-    {
-        // For production, use the real CosmosDB
-        services.AddSingleton<ICosmosDb>(sp => 
-            new CosmosDbAdapter(Configuration.GetConnectionString("CosmosDb")));
-    }
-    
-    // Register your services that depend on ICosmosDb
-    services.AddScoped<IUserRepository, UserRepository>();
+	// Register CosmosClient for production
+	services.AddSingleton(sp =>
+		new CosmosClient(Configuration.GetConnectionString("CosmosDb")));
+
+	// Register your services that depend on CosmosClient
+	services.AddScoped<IUserRepository, UserRepository>();
+}
+
+// Test code
+public class ApiTests : IClassFixture<WebApplicationFactory<Program>>
+{
+	private readonly WebApplicationFactory<Program> _factory;
+	private readonly HttpClient _client;
+
+	public ApiTests(WebApplicationFactory<Program> factory)
+	{
+		// Replace the real CosmosClient with our fake for testing
+		_factory = factory.WithWebHostBuilder(builder =>
+		{
+			builder.ConfigureServices(services =>
+			{
+				// Remove the registered CosmosClient
+				var descriptor = services.SingleOrDefault(d =>
+					d.ServiceType == typeof(CosmosClient));
+				if (descriptor != null)
+					services.Remove(descriptor);
+
+				// Add our fake implementation
+				var fakeClient = new FakeCosmosDb();
+				fakeClient.AddContainerAsync("users").Wait();
+
+				// Seed test data
+				fakeClient.AddItemAsync("users", new { id = "1", name = "Test User" }).Wait();
+
+				// Register the fake client
+				services.AddSingleton<CosmosClient>(fakeClient);
+			});
+		});
+
+		_client = _factory.CreateClient();
+	}
+
+	[Fact]
+	public async Task GetUser_ReturnsUser()
+	{
+		// Act - test the API endpoint that uses CosmosClient
+		var response = await _client.GetAsync("/api/users/1");
+
+		// Assert
+		response.EnsureSuccessStatusCode();
+		var content = await response.Content.ReadAsStringAsync();
+		Assert.Contains("Test User", content);
+	}
 }
 ```
+
+### Example 2: Using with Abstraction Layer
+
+```csharp
+// Production code in Startup.cs or Program.cs
+public void ConfigureServices(IServiceCollection services)
+{
+	// For production, use the CosmosDbAdapter with real CosmosClient
+	services.AddSingleton<ICosmosDb>(sp =>
+		new CosmosDbAdapter(Configuration.GetConnectionString("CosmosDb")));
+
+	// Register your services that depend on ICosmosDb
+	services.AddScoped<IUserRepository, UserRepository>();
+}
+
+// Test code
+public class ApiTests : IClassFixture<WebApplicationFactory<Program>>
+{
+	private readonly WebApplicationFactory<Program> _factory;
+	private readonly HttpClient _client;
+
+	public ApiTests(WebApplicationFactory<Program> factory)
+	{
+		// Replace the CosmosDbAdapter with our fake for testing
+		_factory = factory.WithWebHostBuilder(builder =>
+		{
+			builder.ConfigureServices(services =>
+			{
+				// Remove the registered CosmosDbAdapter
+				var descriptor = services.SingleOrDefault(d =>
+					d.ServiceType == typeof(ICosmosDb));
+				if (descriptor != null)
+					services.Remove(descriptor);
+
+				// Add our fake implementation
+				var fakeDb = new FakeCosmosDb();
+				fakeDb.AddContainerAsync("users").Wait();
+
+				// Seed test data
+				fakeDb.AddItemAsync("users", new { id = "1", name = "Test User" }).Wait();
+
+				// Register the fake implementation
+				services.AddSingleton<ICosmosDb>(fakeDb);
+			});
+		});
+
+		_client = _factory.CreateClient();
+	}
+
+	[Fact]
+	public async Task GetUser_ReturnsUser()
+	{
+		// Act - test the API endpoint that uses ICosmosDb
+		var response = await _client.GetAsync("/api/users/1");
+
+		// Assert
+		response.EnsureSuccessStatusCode();
+		var content = await response.Content.ReadAsStringAsync();
+		Assert.Contains("Test User", content);
+	}
+}
+```
+
+## Supported Query Features
+
+```csharp
+// Basic filtering
+var results = await cosmosDb.QueryAsync("users", "SELECT * FROM c WHERE c.name = 'Alice'");
+
+// Numeric comparisons
+var results = await cosmosDb.QueryAsync("users", "SELECT * FROM c WHERE c.age > 30");
+
+// String functions
+var results = await cosmosDb.QueryAsync("users", "SELECT * FROM c WHERE CONTAINS(c.name, 'Ali')");
+
+// Projections
+var results = await cosmosDb.QueryAsync("users", "SELECT c.name, c.email FROM c");
+
+// Pagination
+var (items, token) = await cosmosDb.QueryWithPaginationAsync(
+	"users",
+	"SELECT * FROM c",
+	maxItemCount: 10
+);
+```
+
+## Test Coverage
+
+The project includes extensive unit tests covering:
+
+- Basic CRUD operations
+- SQL query parsing and execution
+- Data type handling in queries
+- Projections and field selection
+- Pagination functionality
+- Index-based query optimization
+- Adapter functionality for real Cosmos DB
+
+Run the tests with:
+
+```sh
+dotnet test -v n
+```
+
+## Internal Architecture
+
+The project is organized into several key components:
+
+### Core Components
+
+- **FakeCosmosDb**: Main entry point that implements the ICosmosDb interface
+- **FakeContainer**: In-memory implementation of a Cosmos DB container
+- **FakeDatabase**: Manages collections of containers
+
+### Query Processing
+
+- **Parsing/CosmosDbSqlQueryParser**: Parses SQL queries into an abstract syntax tree
+- **Parsing/CosmosDbSqlAst**: Defines the structure for the abstract syntax tree
+- **Parsing/CosmosDbSqlGrammar**: Contains the grammar rules for SQL parsing
+- **CosmosDbQueryExecutor**: Executes parsed queries against the in-memory data
+
+### Data Management
+
+- **CosmosDbIndexManager**: Manages indexes for optimizing query performance
+- **CosmosDbPaginationManager**: Handles pagination with continuation tokens
+
+### Real Cosmos DB Support
+
+- **CosmosDbAdapter**: Adapter for the real Cosmos DB client, implementing ICosmosDb
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Here's how you can help:
+
+1. **Report bugs or request features** by opening an issue
+2. **Implement missing functionality** by submitting a pull request
+3. **Improve documentation** to help others use the library
+4. **Add test cases** to increase coverage
+
+### Development Guidelines
+
+- Follow TDD practices for all new features
+- Keep SQL query parsing logic in the parsing code, not in the executor
+- Use method chaining syntax (`.Select()`, `.Where()`) instead of LINQ query syntax (`from ... in ... select`) due to netstandard2.1 compatibility
+- Respect the .editorconfig settings
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - [License information](LICENSE)
