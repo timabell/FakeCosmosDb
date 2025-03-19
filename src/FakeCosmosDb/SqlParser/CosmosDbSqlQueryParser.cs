@@ -243,12 +243,29 @@ public class CosmosDbSqlQueryParser
 			conditions.AddRange(ExtractWhereConditions(orExpr.Left));
 			// Ignore the right side in an OR condition
 		}
-		// If it's a binary comparison (=, >, <, etc.), convert to a WhereCondition
-		else if (condition is BinaryExpression comparison &&
-				 comparison.Operator != BinaryOperator.And &&
-				 comparison.Operator != BinaryOperator.Or)
+		// If it's a comparison (e.g., Property > Value)
+		if (condition is BinaryExpression comparison)
 		{
-			if (comparison.Left is PropertyExpression leftProp && comparison.Right is ConstantExpression rightConst)
+			// Handle special case for BETWEEN operator
+			if (comparison.Operator == BinaryOperator.Between)
+			{
+				if (comparison.Left is PropertyExpression betweenProp && comparison.Right is BetweenExpression betweenExpr)
+				{
+					// For BETWEEN operator with two constant values
+					if (betweenExpr.LowerBound is ConstantExpression lowerConstExpr &&
+						betweenExpr.UpperBound is ConstantExpression upperConstExpr)
+					{
+						// Create a single BETWEEN condition
+						conditions.Add(new WhereCondition
+						{
+							PropertyPath = betweenProp.PropertyPath,
+							Operator = ComparisonOperator.Between,
+							Value = JToken.FromObject(new object[] { lowerConstExpr.Value, upperConstExpr.Value })
+						});
+					}
+				}
+			}
+			else if (comparison.Left is PropertyExpression leftProp && comparison.Right is ConstantExpression rightConst)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -379,7 +396,8 @@ public class CosmosDbSqlQueryParser
 			BinaryOperator.LessThan => ComparisonOperator.LessThan,
 			BinaryOperator.GreaterThanOrEqual => ComparisonOperator.GreaterThanOrEqual,
 			BinaryOperator.LessThanOrEqual => ComparisonOperator.LessThanOrEqual,
-			_ => throw new ArgumentException($"Unsupported operator: {op}")
+			BinaryOperator.Between => ComparisonOperator.Between,
+			_ => throw new NotSupportedException($"Operator '{op}' is not supported in WHERE conditions")
 		};
 	}
 

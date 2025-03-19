@@ -295,7 +295,8 @@ public enum BinaryOperator
 	GreaterThanOrEqual,
 	LessThanOrEqual,
 	And,
-	Or
+	Or,
+	Between
 }
 
 /// <summary>
@@ -344,4 +345,24 @@ public class FunctionCallExpression : Expression
 	}
 
 	public override string ToString() => $"{FunctionName}({string.Join(", ", Arguments)})";
+}
+
+/// <summary>
+/// Represents a BETWEEN expression, which has a lower and upper bound.
+/// </summary>
+public class BetweenExpression : Expression
+{
+	public Expression LowerBound { get; }
+	public Expression UpperBound { get; }
+
+	public BetweenExpression(Expression lowerBound, Expression upperBound)
+	{
+		LowerBound = lowerBound;
+		UpperBound = upperBound;
+	}
+
+	public override string ToString()
+	{
+		return $"BETWEEN {LowerBound} AND {UpperBound}";
+	}
 }
