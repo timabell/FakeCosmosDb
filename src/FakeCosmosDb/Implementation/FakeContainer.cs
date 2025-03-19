@@ -391,6 +391,9 @@ public class FakeContainer : Container
 
 		public override async Task<FeedResponse<T>> ReadNextAsync(CancellationToken cancellationToken = default)
 		{
+			// Add an await to make this properly async
+			await Task.Yield();
+			
 			var query = _queryDefinition?.QueryText;
 			var parsedQuery = _container._queryParser.Parse(query);
 			var results = _queryExecutor.Execute(parsedQuery, _store);

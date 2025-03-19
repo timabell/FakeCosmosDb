@@ -408,6 +408,14 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			resultsContains.Should().HaveCount(2, "because two documents have names containing 'a'");
 			resultsContains.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Alice" });
 
+			// Act & Assert - Contains with case-insensitive search (third parameter = true)
+			var queryDefinitionContainsCaseInsensitive = new QueryDefinition("SELECT * FROM c WHERE CONTAINS(c.Name, 'A', true)");
+			var iteratorContainsCaseInsensitive = container.GetItemQueryIterator<JObject>(queryDefinitionContainsCaseInsensitive);
+			var resultsContainsCaseInsensitive = await iteratorContainsCaseInsensitive.ReadNextAsync();
+
+			resultsContainsCaseInsensitive.Should().HaveCount(2, "because two documents have names containing 'A' (case-insensitive)");
+			resultsContainsCaseInsensitive.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Alice" });
+
 			// Act & Assert - Case Insensitive
 			var queryDefinitionCaseInsensitive = new QueryDefinition("SELECT * FROM c WHERE c.Name = 'alice'");
 			var iteratorCaseInsensitive = container.GetItemQueryIterator<JObject>(queryDefinitionCaseInsensitive);

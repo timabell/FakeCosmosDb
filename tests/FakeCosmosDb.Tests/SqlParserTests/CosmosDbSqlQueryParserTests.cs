@@ -138,6 +138,44 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	}
 
 	[Fact]
+	public void ShouldParseContainsFunctionWithCaseInsensitiveParameter()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE CONTAINS(c.name, 'John', false)";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+		result.WhereConditions.Should().HaveCount(1);
+		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
+		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
+		result.WhereConditions[0].IgnoreCase.Should().BeFalse();
+	}
+
+	[Fact]
+	public void ShouldParseContainsFunctionWithCaseSensitiveParameter()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE CONTAINS(c.name, 'John', true)";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+		result.WhereConditions.Should().HaveCount(1);
+		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
+		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
+		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
+		result.WhereConditions[0].IgnoreCase.Should().BeTrue();
+	}
+
+	[Fact]
 	public void ShouldParseStartsWithFunction()
 	{
 		// Arrange

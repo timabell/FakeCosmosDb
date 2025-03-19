@@ -276,7 +276,7 @@ public class CosmosDbSqlQueryParser
 			string functionName = functionCall.FunctionName.ToUpperInvariant();
 
 			if ((functionName == "CONTAINS" || functionName == "STARTSWITH") &&
-				functionCall.Arguments.Count == 2 &&
+				functionCall.Arguments.Count >= 2 &&
 				functionCall.Arguments[0] is PropertyExpression propExpr &&
 				functionCall.Arguments[1] is ConstantExpression constExpr)
 			{
@@ -284,12 +284,22 @@ public class CosmosDbSqlQueryParser
 					ComparisonOperator.StringContains :
 					ComparisonOperator.StringStartsWith;
 
-				conditions.Add(new WhereCondition
+				var whereCondition = new WhereCondition
 				{
 					PropertyPath = propExpr.PropertyPath,
 					Operator = op,
 					Value = JToken.FromObject(constExpr.Value)
-				});
+				};
+
+				// For CONTAINS with 3 arguments, the third is a boolean for case-insensitivity
+				if (functionName == "CONTAINS" && functionCall.Arguments.Count == 3 && 
+					functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
+					caseInsensitiveArg.Value is bool ignoreCase)
+				{
+					whereCondition.IgnoreCase = ignoreCase;
+				}
+
+				conditions.Add(whereCondition);
 			}
 			else if (functionName == "IS_NULL" &&
 					functionCall.Arguments.Count == 1 &&
@@ -531,6 +541,12 @@ public class WhereCondition
 	/// The value to compare with.
 	/// </summary>
 	public JToken Value { get; set; }
+
+	/// <summary>
+	/// For CONTAINS function, indicates whether the search should be case-insensitive.
+	/// When true, the search is case-insensitive. When false or null, the search is case-sensitive.
+	/// </summary>
+	public bool? IgnoreCase { get; set; }
 }
 
 /// <summary>

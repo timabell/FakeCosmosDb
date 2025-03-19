@@ -220,10 +220,10 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Checking {property} {operator} {value}",
 					condition.PropertyPath, condition.Operator, condition.Value);
 				_logger.LogDebug("Document property value: {value} (Type: {type})",
-					propertyValue?.ToString() ?? "null", propertyValue?.Type.ToString() ?? "null");
+					propertyValue?.ToString() ?? "null", propertyValue != null ? propertyValue.Type.ToString() : "null");
 			}
 
-			var matches = EvaluateCondition(propertyValue, condition.Operator, condition.Value);
+			var matches = EvaluateCondition(propertyValue, condition.Operator, condition.Value, condition.IgnoreCase ?? false);
 			if (_logger != null)
 			{
 				_logger.LogDebug("Condition result: {result}", matches);
@@ -238,7 +238,7 @@ public class CosmosDbQueryExecutor
 		return true;
 	}
 
-	private bool EvaluateCondition(JToken propertyValue, ComparisonOperator op, JToken conditionValue)
+	private bool EvaluateCondition(JToken propertyValue, ComparisonOperator op, JToken conditionValue, bool ignoreCase)
 	{
 		// Handle null property values
 		if (propertyValue == null)
@@ -318,6 +318,10 @@ public class CosmosDbQueryExecutor
 				return equality;
 
 			case ComparisonOperator.NotEquals:
+				if (conditionObj is JToken jToken)
+				{
+					return !JToken.DeepEquals(propertyValue, jToken);
+				}
 				return !JToken.DeepEquals(propertyValue, JToken.FromObject(conditionObj));
 
 			case ComparisonOperator.GreaterThan:
@@ -333,12 +337,26 @@ public class CosmosDbQueryExecutor
 				return CompareValues(propertyValue, conditionObj) <= 0;
 
 			case ComparisonOperator.StringContains:
-				if (propertyValue.Type == JTokenType.String && conditionObj is string containsValue)
+				var containsPropertyValue = propertyValue?.ToString();
+				var containsSearchValue = conditionObj?.ToString();
+
+				if (containsPropertyValue == null || containsSearchValue == null)
 				{
-					return propertyValue.Value<string>().IndexOf(containsValue, StringComparison.OrdinalIgnoreCase) >= 0;
+					_logger?.LogDebug("String contains comparison: one of the values is null");
+					return false;
 				}
 
-				return false;
+				var containsResult = ignoreCase
+					? containsPropertyValue.IndexOf(containsSearchValue, StringComparison.OrdinalIgnoreCase) >= 0
+					: containsPropertyValue.Contains(containsSearchValue);
+
+				if (_logger != null)
+				{
+					_logger.LogDebug("String contains comparison: '{left}' contains '{right}' (ignoreCase: {ignoreCase}) = {result}",
+						containsPropertyValue, containsSearchValue, ignoreCase, containsResult);
+				}
+
+				return containsResult;
 
 			case ComparisonOperator.StringStartsWith:
 				if (propertyValue.Type == JTokenType.String && conditionObj is string startsWithValue)
@@ -640,7 +658,7 @@ public class CosmosDbQueryExecutor
 		{
 			boolResult = b;
 		}
-		else if (result != null)
+		else if (result is object) // Changed from result != null to resolve warning
 		{
 			boolResult = Convert.ToBoolean(result);
 		}
@@ -665,7 +683,7 @@ public class CosmosDbQueryExecutor
 		{
 			var propValue = GetPropertyValue(item, condition.PropertyPath);
 
-			// For string comparisons, we might need to handle the stored JToken format 
+			// For string comparisons, we might need to handle the stored JToken format
 			if (!CompareCondition(propValue, condition.Operator, condition.Value))
 			{
 				return false;
@@ -815,43 +833,31 @@ public class CosmosDbQueryExecutor
 		return false;
 	}
 
-	private bool CompareCondition(JToken propertyValue, JToken conditionValue, ComparisonOperator operatorEnum)
+	private bool CompareCondition(JObject item, WhereCondition condition)
 	{
-		// Extract primitive values for comparison
-		object propValue = propertyValue?.Value<object>();
-		object conditionObj = null;
-		if (conditionValue != null)
+		if (condition == null)
 		{
-			// Extract primitive value from JToken
-			switch (conditionValue.Type)
-			{
-				case JTokenType.String:
-					conditionObj = conditionValue.Value<string>();
-					break;
-				case JTokenType.Integer:
-					conditionObj = conditionValue.Value<int>();
-					break;
-				case JTokenType.Float:
-					conditionObj = conditionValue.Value<double>();
-					break;
-				case JTokenType.Boolean:
-					conditionObj = conditionValue.Value<bool>();
-					break;
-				default:
-					conditionObj = conditionValue.ToString();
-					break;
-			}
-
-			if (_logger != null)
-			{
-				_logger.LogDebug("Extracted condition value: {value} (Type: {type})",
-					conditionObj, conditionObj?.GetType().Name ?? "null");
-				_logger.LogDebug("Property value for comparison: {value} (Type: {type})",
-					propertyValue.ToString(), propertyValue.Type.ToString());
-			}
+			return true;
 		}
 
-		return CompareValues(propValue, conditionObj, operatorEnum);
+		var propertyValue = GetPropertyValue(item, condition.PropertyPath);
+		if (_logger != null)
+		{
+			_logger.LogDebug("Comparing property '{path}' (value: {value}, type: {type}) with condition",
+				condition.PropertyPath,
+				propertyValue?.ToString() ?? "null", propertyValue != null ? propertyValue.GetType().Name : "null");
+		}
+
+		// Convert propertyValue to JToken if it's not already
+		JToken jPropertyValue = propertyValue as JToken ?? (propertyValue != null ? JToken.FromObject(propertyValue) : null);
+		
+		var matches = EvaluateCondition(jPropertyValue, condition.Operator, condition.Value, condition.IgnoreCase ?? false);
+		if (_logger != null)
+		{
+			_logger.LogDebug("Condition result: {result}", matches);
+		}
+
+		return matches;
 	}
 
 	private bool CompareValues(object propValue, object value, ComparisonOperator operatorEnum)
@@ -1124,7 +1130,6 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("JValue string not-equals comparison: '{left}' != '{right}'", leftStr, rightStr);
 							}
-
 							return !string.Equals(leftStr, rightStr, StringComparison.OrdinalIgnoreCase);
 						}
 					}
@@ -1473,20 +1478,35 @@ public class CosmosDbQueryExecutor
 		switch (function.Name.ToUpperInvariant())
 		{
 			case "CONTAINS":
-				if (function.Arguments.Count != 2)
+				if (function.Arguments.Count < 2 || function.Arguments.Count > 3)
 				{
-					throw new ArgumentException("CONTAINS function requires exactly 2 arguments");
+					throw new ArgumentException("CONTAINS function requires 2 or 3 arguments");
 				}
 
 				var containsPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
 				var containsSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+
+				// Third argument is an optional boolean for case insensitivity
+				// When set to true, CONTAINS performs a case-insensitive search
+				// When unspecified, this value defaults to false (case-sensitive)
+				var ignoreCase = false;
+				if (function.Arguments.Count == 3)
+				{
+					var caseInsensitiveArg = EvaluateValue(item, function.Arguments[2]);
+					if (caseInsensitiveArg != null && bool.TryParse(caseInsensitiveArg.ToString(), out bool ignoreResult))
+					{
+						ignoreCase = ignoreResult;
+					}
+				}
 
 				if (containsPropertyValue == null || containsSearchValue == null)
 				{
 					return false;
 				}
 
-				return containsPropertyValue.Contains(containsSearchValue);
+				return ignoreCase
+					? containsPropertyValue.IndexOf(containsSearchValue, StringComparison.OrdinalIgnoreCase) >= 0
+					: containsPropertyValue.Contains(containsSearchValue);
 
 			case "STARTSWITH":
 				if (function.Arguments.Count != 2)
