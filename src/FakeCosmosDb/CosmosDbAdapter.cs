@@ -47,63 +47,39 @@ public class CosmosDbAdapter : ICosmosDb
 		_cosmosClient = new CosmosClient(cosmosOptionsAccountEndpoint, cosmosOptionsAccountKey, clientOptions);
 	}
 
-	public async Task AddContainerAsync(string containerName)
+	public Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		_logger?.LogInformation("Creating container {containerName} if it doesn't exist", containerName);
-		await _cosmosClient.GetDatabase(_databaseId).CreateContainerIfNotExistsAsync(containerName, "/id");
+		throw new System.NotImplementedException();
 	}
 
-	public async Task AddItemAsync(string containerName, object entity)
+	public FeedIterator<T> GetDatabaseQueryIterator<T>(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		_logger?.LogInformation("Adding item to container {containerName}", containerName);
-		var container = _cosmosClient.GetContainer(_databaseId, containerName);
-		await container.CreateItemAsync(entity);
+		throw new System.NotImplementedException();
 	}
 
-	public async Task<IEnumerable<JObject>> QueryAsync(string containerName, string sql)
+	public FeedIterator<T> GetDatabaseQueryIterator<T>(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		_logger?.LogInformation("Executing query on container {containerName}: {sql}", containerName, sql);
-		var container = _cosmosClient.GetContainer(_databaseId, containerName);
-		var queryDefinition = new QueryDefinition(sql);
-		var iterator = container.GetItemQueryIterator<JObject>(queryDefinition);
-		var results = new List<JObject>();
-
-		while (iterator.HasMoreResults)
-		{
-			var response = await iterator.ReadNextAsync();
-			results.AddRange(response);
-		}
-
-		_logger?.LogInformation("Query returned {count} results", results.Count);
-		return results;
+		throw new System.NotImplementedException();
 	}
 
-	public async Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null)
+	public FeedIterator GetDatabaseQueryStreamIterator(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		_logger?.LogInformation("Executing paginated query on container {containerName}: {sql}", containerName, sql);
-		_logger?.LogInformation("Max items: {maxItemCount}, Continuation token: {continuationToken}", maxItemCount, continuationToken ?? "null");
+		throw new System.NotImplementedException();
+	}
 
-		var container = _cosmosClient.GetContainer(_databaseId, containerName);
-		var queryDefinition = new QueryDefinition(sql);
+	public Task<AccountProperties> ReadAccountAsync()
+	{
+		throw new System.NotImplementedException();
+	}
 
-		// Create query options with pagination parameters
-		var queryOptions = new QueryRequestOptions
-		{
-			MaxItemCount = maxItemCount
-		};
+	public FeedIterator GetDatabaseQueryStreamIterator(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null)
+	{
+		throw new System.NotImplementedException();
+	}
 
-		// Use the continuation token if provided
-		var iterator = string.IsNullOrEmpty(continuationToken)
-			? container.GetItemQueryIterator<JObject>(queryDefinition, requestOptions: queryOptions)
-			: container.GetItemQueryIterator<JObject>(queryDefinition, continuationToken, requestOptions: queryOptions);
-
-		// Read the next page
-		var response = await iterator.ReadNextAsync();
-
-		_logger?.LogInformation("Query returned {count} results with continuation token: {token}",
-			response.Count, response.ContinuationToken ?? "null");
-
-		return (response, response.ContinuationToken);
+	public Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	{
+		throw new System.NotImplementedException();
 	}
 
 	public Container GetContainer(string databaseName, string containerId)
@@ -119,5 +95,15 @@ public class CosmosDbAdapter : ICosmosDb
 	public Database GetDatabase(string databaseName)
 	{
 		return _cosmosClient.GetDatabase(databaseName);
+	}
+
+	public Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	{
+		throw new System.NotImplementedException();
+	}
+
+	public Task<DatabaseResponse> CreateDatabaseAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)
+	{
+		throw new System.NotImplementedException();
 	}
 }
