@@ -22,15 +22,17 @@ namespace TimAbell.FakeCosmosDb;
 /// </summary>
 public class FakeCosmosDb : CosmosClient, ICosmosDb
 {
-	private readonly Dictionary<string, InMemoryContainer> _containers = new();
+	private readonly Dictionary<string, FakeContainer> _containers = new();
 	private readonly CosmosDbSqlQueryParser _queryParser;
 	private readonly ILogger _logger;
 	private readonly CosmosDbQueryExecutor _queryExecutor;
+	private readonly ICosmosDbPaginationManager _paginationManager;
 
 	public FakeCosmosDb()
 	{
 		_queryParser = new CosmosDbSqlQueryParser();
 		_queryExecutor = new CosmosDbQueryExecutor();
+		_paginationManager = new CosmosDbPaginationManager();
 	}
 
 	public FakeCosmosDb(ILogger logger)
@@ -38,12 +40,13 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		_logger = logger;
 		_queryParser = new CosmosDbSqlQueryParser(_logger);
 		_queryExecutor = new CosmosDbQueryExecutor(logger);
+		_paginationManager = new CosmosDbPaginationManager();
 	}
 
 	public Task AddContainerAsync(string containerName)
 	{
 		if (!_containers.ContainsKey(containerName))
-			_containers[containerName] = new InMemoryContainer(_logger);
+			_containers[containerName] = new FakeContainer(_logger);
 		return Task.CompletedTask;
 	}
 
@@ -52,7 +55,10 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		if (!_containers.ContainsKey(containerName))
 			throw new InvalidOperationException($"Container '{containerName}' does not exist.");
 
-		return _containers[containerName].AddAsync(entity);
+		var json = JObject.FromObject(entity);
+		var id = json["id"]?.ToString() ?? throw new InvalidOperationException("Entity must have an 'id' property.");
+		_containers[containerName].Documents.Add(json);
+		return Task.CompletedTask;
 	}
 
 	public Task<IEnumerable<JObject>> QueryAsync(string containerName, string sql)
@@ -95,10 +101,13 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 	public Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null)
 	{
-		if (!_containers.ContainsKey(containerName))
+		if (!_containers.TryGetValue(containerName, out var container))
 			throw new InvalidOperationException($"Container '{containerName}' does not exist.");
 
-		return _containers[containerName].QueryWithPaginationAsync(sql, maxItemCount, continuationToken);
+		var parsedQuery = _queryParser.Parse(sql);
+		var results = _queryExecutor.Execute(parsedQuery, container.Documents);
+		var (pagedResults, nextToken) = _paginationManager.GetPage(results, maxItemCount, continuationToken);
+		return Task.FromResult((pagedResults, nextToken));
 	}
 
 	public override Container GetContainer(string databaseName, string containerId)
