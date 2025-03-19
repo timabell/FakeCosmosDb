@@ -663,7 +663,39 @@ public class CosmosDbQueryExecutor
 
 			if (current is JObject obj)
 			{
-				current = obj[parts[i]];
+				// Case-insensitive property lookup
+				string currentPart = parts[i];
+
+				// First try direct lookup (faster)
+				JToken directResult = obj[currentPart];
+				if (directResult != null)
+				{
+					current = directResult;
+					continue;
+				}
+
+				// If not found, try case-insensitive lookup
+				var property = obj.Properties()
+					.FirstOrDefault(p => string.Equals(p.Name, currentPart, StringComparison.OrdinalIgnoreCase));
+
+				if (property != null)
+				{
+					current = property.Value;
+					if (_logger != null)
+					{
+						_logger.LogDebug("Case-insensitive match found for '{requestedName}' -> '{actualName}'",
+							currentPart, property.Name);
+					}
+				}
+				else
+				{
+					// Property not found
+					if (_logger != null)
+					{
+						_logger.LogDebug("Property '{name}' not found in object", currentPart);
+					}
+					return null;
+				}
 			}
 			else
 			{
