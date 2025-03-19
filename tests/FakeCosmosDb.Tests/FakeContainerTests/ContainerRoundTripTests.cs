@@ -26,17 +26,17 @@ public class ContainerRoundTripTests
 		var logger = new TestLogger(_output);
 		var cosmosDb = new FakeCosmosDb(logger);
 
-		// Add a container via the ICosmosDb interface
-		await cosmosDb.AddContainerAsync(_containerName);
+		// Create the database
+		await cosmosDb.CreateDatabaseIfNotExistsAsync(_databaseName);
 
-		// Add an item via the ICosmosDb interface
-		var testItem = new { id = "test1", name = "Test Item 1" };
-		await cosmosDb.AddItemAsync(_containerName, testItem);
-
-		// Act - Get the container via the CosmosClient interface
+		// Get the container via the CosmosClient interface
 		var container = cosmosDb.GetContainer(_databaseName, _containerName);
 
-		// Query the container to see if the item is there
+		// Add an item via the container interface
+		var testItem = new { id = "test1", name = "Test Item 1" };
+		await container.CreateItemAsync(testItem);
+
+		// Act - Query the container to see if the item is there
 		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.id = 'test1'");
 		var iterator = container.GetItemQueryIterator<JObject>(queryDefinition);
 		var response = await iterator.ReadNextAsync();
@@ -52,6 +52,9 @@ public class ContainerRoundTripTests
 		// Arrange
 		var logger = new TestLogger(_output);
 		var cosmosDb = new FakeCosmosDb(logger);
+
+		// Create the database
+		await cosmosDb.CreateDatabaseIfNotExistsAsync(_databaseName);
 
 		// Get container and add an item via the CosmosClient interface
 		var container1 = cosmosDb.GetContainer(_databaseName, _containerName);
@@ -76,6 +79,10 @@ public class ContainerRoundTripTests
 		// Arrange
 		var logger = new TestLogger(_output);
 		var cosmosDb = new FakeCosmosDb(logger);
+
+		// Create the databases
+		await cosmosDb.CreateDatabaseIfNotExistsAsync("database1");
+		await cosmosDb.CreateDatabaseIfNotExistsAsync("database2");
 
 		// Get container from database1 and add an item
 		var container1 = cosmosDb.GetContainer("database1", _containerName);

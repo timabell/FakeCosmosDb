@@ -16,28 +16,40 @@ public class DataRoundTripTests
 	private readonly ITestOutputHelper _output;
 	private readonly string _databaseName = "testdb";
 	private readonly string _containerName = "testcontainer";
+	private FakeCosmosDb _cosmosDb;
+	private Container _container;
 
 	public DataRoundTripTests(ITestOutputHelper output)
 	{
 		_output = output;
 	}
 
+	private async Task InitializeAsync()
+	{
+		_cosmosDb = new FakeCosmosDb();
+		await _cosmosDb.CreateDatabaseIfNotExistsAsync(_databaseName);
+		_container = _cosmosDb.GetContainer(_databaseName, _containerName);
+	}
+
+	private async Task AddTestItemAsync<T>(T item)
+	{
+		await _container.CreateItemAsync(item);
+	}
+
 	[Fact]
 	public async Task WriteWithContainer_ReadWithICosmosDb_ShouldRoundTrip()
 	{
 		// Arrange
-		var logger = new TestLogger(_output);
-		var cosmosDb = new FakeCosmosDb(logger);
-
-		// Add container via ICosmosDb interface
-		await cosmosDb.AddContainerAsync(_containerName);
+		await InitializeAsync();
 
 		// Write data using Container API
-		var container = cosmosDb.GetContainer(_databaseName, _containerName);
-		await container.UpsertItemAsync(new { id = "test3", name = "Test Item 3", value = 42 });
+		await AddTestItemAsync(new { id = "test3", name = "Test Item 3", value = 42 });
 
-		// Act - Read data using ICosmosDb interface
-		var results = await cosmosDb.QueryAsync(_containerName, "SELECT * FROM c WHERE c.id = 'test3'");
+		// Act - Read data using Container API
+		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.id = 'test3'");
+		var iterator = _container.GetItemQueryIterator<JObject>(queryDefinition);
+		var response = await iterator.ReadNextAsync();
+		var results = response.ToList();
 
 		// Assert
 		Assert.Single(results);
@@ -49,17 +61,13 @@ public class DataRoundTripTests
 	public async Task WriteWithICosmosDb_ReadWithContainer_ShouldRoundTrip()
 	{
 		// Arrange
-		var logger = new TestLogger(_output);
-		var cosmosDb = new FakeCosmosDb(logger);
+		await InitializeAsync();
 
-		// Add container and write data via ICosmosDb interface
-		// Use "/id" as the partition key path
-		await cosmosDb.AddContainerAsync(_containerName, "/id");
-		await cosmosDb.AddItemAsync(_containerName, new { id = "test4", name = "Test Item 4", value = 99 });
+		// Write data using Container API
+		await _container.CreateItemAsync(new { id = "test4", name = "Test Item 4", value = 99 });
 
 		// Act - Read data using Container API
-		var container = cosmosDb.GetContainer(_databaseName, _containerName);
-		var response = await container.ReadItemAsync<JObject>("test4", new PartitionKey("test4"));
+		var response = await _container.ReadItemAsync<JObject>("test4", new PartitionKey("test4"));
 
 		// Assert
 		Assert.Equal("Test Item 4", response.Resource["name"].ToString());
@@ -70,15 +78,13 @@ public class DataRoundTripTests
 	public async Task WriteWithContainer_ReadWithSameNamedContainer_ShouldRoundTrip()
 	{
 		// Arrange
-		var logger = new TestLogger(_output);
-		var cosmosDb = new FakeCosmosDb(logger);
+		await InitializeAsync();
 
 		// Write data using Container API with specific name
-		var container1 = cosmosDb.GetContainer(_databaseName, _containerName);
-		await container1.UpsertItemAsync(new { id = "test5", name = "Test Item 5" });
+		await AddTestItemAsync(new { id = "test5", name = "Test Item 5" });
 
 		// Act - Read data using a different Container instance but same database and container name
-		var container2 = cosmosDb.GetContainer(_databaseName, _containerName);
+		var container2 = _cosmosDb.GetContainer(_databaseName, _containerName);
 		var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.id = 'test5'");
 		var iterator = container2.GetItemQueryIterator<JObject>(queryDefinition);
 		var response = await iterator.ReadNextAsync();

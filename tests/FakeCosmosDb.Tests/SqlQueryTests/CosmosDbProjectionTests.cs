@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
 using FluentAssertions.Execution;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
@@ -11,24 +12,32 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests;
 
 public class CosmosDbProjectionTests
 {
-	private readonly FakeCosmosDb _db;
-	private readonly string _containerName = "ProjectionTest";
+	private readonly FakeCosmosDb _cosmosDb;
+	private readonly string _databaseName = "ProjectionTestDb";
+	private readonly string _containerName = "ProjectionTestContainer";
 	private readonly ITestOutputHelper _output;
 	private readonly ILogger _logger;
+	private Container _container;
 
 	public CosmosDbProjectionTests(ITestOutputHelper output)
 	{
 		_output = output;
 		_logger = new TestLogger(output);
-		_db = new FakeCosmosDb(_logger);
-		_db.AddContainerAsync(_containerName).Wait();
-		SeedTestData().Wait();
+		_cosmosDb = new FakeCosmosDb(_logger);
+		InitializeAsync().Wait();
+	}
+
+	private async Task InitializeAsync()
+	{
+		await _cosmosDb.CreateDatabaseIfNotExistsAsync(_databaseName);
+		_container = _cosmosDb.GetContainer(_databaseName, _containerName);
+		await SeedTestData();
 	}
 
 	private async Task SeedTestData()
 	{
 		// Add test items with various properties for testing projections
-		await _db.AddItemAsync(_containerName, new
+		await AddTestItemAsync(new
 		{
 			id = "1",
 			Name = "John Smith",
@@ -38,7 +47,7 @@ public class CosmosDbProjectionTests
 			Tags = new[] { "developer", "c#", "azure" }
 		});
 
-		await _db.AddItemAsync(_containerName, new
+		await AddTestItemAsync(new
 		{
 			id = "2",
 			Name = "Jane Doe",
@@ -48,7 +57,7 @@ public class CosmosDbProjectionTests
 			Tags = new[] { "designer", "ui", "ux" }
 		});
 
-		await _db.AddItemAsync(_containerName, new
+		await AddTestItemAsync(new
 		{
 			id = "3",
 			Name = "Bob Johnson",
@@ -59,14 +68,19 @@ public class CosmosDbProjectionTests
 		});
 	}
 
+	private async Task AddTestItemAsync<T>(T item)
+	{
+		await _container.CreateItemAsync(item);
+	}
+
 	[Fact]
 	public async Task Query_WithSelectProjection_ReturnsOnlyRequestedFields()
 	{
 		// Query with projection
-		var results = await _db.QueryAsync(_containerName, "SELECT c.Name, c.Age FROM c");
+		var results = await _container.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>("SELECT c.Name, c.Age FROM c").ReadNextAsync();
 
 		// Should return 3 items with only Name and Age (plus id for consistency)
-		Assert.Equal(3, results.Count());
+		Assert.Equal(3, results.Count);
 
 		foreach (var item in results)
 		{
@@ -87,7 +101,7 @@ public class CosmosDbProjectionTests
 	public async Task Query_WithNestedPropertyProjection_ReturnsNestedStructure()
 	{
 		// Query with nested property projection
-		var results = await _db.QueryAsync(_containerName, "SELECT c.Name, c.Address.City FROM c");
+		var results = await _container.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>("SELECT c.Name, c.Address.City FROM c").ReadNextAsync();
 
 		// Should return 3 items with Name and Address.City
 		results.Should().HaveCount(3, because: "we have 3 documents in the test container");
@@ -139,20 +153,20 @@ public class CosmosDbProjectionTests
 	public async Task Query_WithLimit_ReturnsLimitedResults()
 	{
 		// Query with LIMIT
-		var results = await _db.QueryAsync(_containerName, "SELECT * FROM c LIMIT 2");
+		var results = await _container.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>("SELECT * FROM c LIMIT 2").ReadNextAsync();
 
 		// Should return only 2 items
-		Assert.Equal(2, results.Count());
+		Assert.Equal(2, results.Count);
 	}
 
 	[Fact]
 	public async Task Query_WithProjectionAndFilter_ReturnsFilteredProjection()
 	{
 		// Query with both projection and filter
-		var results = await _db.QueryAsync(_containerName, "SELECT c.Name, c.Age FROM c WHERE c.Age > 25");
+		var results = await _container.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>("SELECT c.Name, c.Age FROM c WHERE c.Age > 25").ReadNextAsync();
 
 		// Should return 2 items (John and Bob) with only Name and Age
-		Assert.Equal(2, results.Count());
+		Assert.Equal(2, results.Count);
 
 		foreach (var item in results)
 		{

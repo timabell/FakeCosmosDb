@@ -133,7 +133,7 @@ namespace TimAbell.FakeCosmosDb.Tests.FakeContainerTests
 		{
 			// Arrange
 			var fakeContainer = new FakeContainer(_logger);
-			
+
 			// In real Cosmos DB, the partition key is a path to a property in the document
 			// For this test, we'll simulate a container with partition key path "/category"
 			fakeContainer.PartitionKeyPath = "/category";
