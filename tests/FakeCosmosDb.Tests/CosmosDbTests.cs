@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;
@@ -47,8 +48,8 @@ public class CosmosDbTests
 		var results = await iterator.ReadNextAsync();
 
 		Assert.Single(results);
-		var result = results.First();
-		Assert.Equal("Alice", result.GetType().GetProperty("Name").GetValue(result));
+		var result = results.First() as JObject;
+		Assert.Equal("Alice", result.GetValue("Name"));
 	}
 
 	public static IEnumerable<object[]> TestConfigurations()
