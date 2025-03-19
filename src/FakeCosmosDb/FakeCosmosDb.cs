@@ -67,11 +67,11 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		return GetOrCreateDatabase(DefaultDatabaseName);
 	}
 
-	public Task AddContainerAsync(string containerName)
+	public Task AddContainerAsync(string containerName, string partitionKeyPath = "/id")
 	{
 		// Get the default database and create a container in it
 		var defaultDb = GetDefaultDatabase();
-		defaultDb.GetOrCreateContainer(containerName);
+		defaultDb.GetOrCreateContainer(containerName, partitionKeyPath);
 		return Task.CompletedTask;
 	}
 

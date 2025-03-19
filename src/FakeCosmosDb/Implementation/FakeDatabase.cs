@@ -23,14 +23,17 @@ public class FakeDatabase : Database
 	}
 
 	// Get or create a container in this database
-	public FakeContainer GetOrCreateContainer(string containerId)
+	public FakeContainer GetOrCreateContainer(string containerId, string partitionKeyPath = "/id")
 	{
 		if (_containers.TryGetValue(containerId, out var existingContainer))
 		{
 			return existingContainer;
 		}
 
-		var newContainer = new FakeContainer(_logger);
+		var newContainer = new FakeContainer(_logger)
+		{
+			PartitionKeyPath = partitionKeyPath
+		};
 		_containers[containerId] = newContainer;
 		return newContainer;
 	}

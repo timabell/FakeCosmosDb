@@ -53,7 +53,8 @@ public class DataRoundTripTests
 		var cosmosDb = new FakeCosmosDb(logger);
 
 		// Add container and write data via ICosmosDb interface
-		await cosmosDb.AddContainerAsync(_containerName);
+		// Use "/id" as the partition key path
+		await cosmosDb.AddContainerAsync(_containerName, "/id");
 		await cosmosDb.AddItemAsync(_containerName, new { id = "test4", name = "Test Item 4", value = 99 });
 
 		// Act - Read data using Container API

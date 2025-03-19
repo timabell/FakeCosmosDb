@@ -133,16 +133,16 @@ namespace TimAbell.FakeCosmosDb.Tests.FakeContainerTests
 		{
 			// Arrange
 			var fakeContainer = new FakeContainer(_logger);
+			
+			// In real Cosmos DB, the partition key is a path to a property in the document
+			// For this test, we'll simulate a container with partition key path "/category"
+			fakeContainer.PartitionKeyPath = "/category";
 
-			// Use simple string constants for partition keys
-			const string partitionKey1 = "partition1";
-			const string partitionKey2 = "partition2";
-
-			// Add two items with same ID but different partition keys
+			// Add two items with same ID but different category values (which act as partition keys)
 			var item1 = new JObject
 			{
 				["id"] = "duplicateId",
-				["partitionKey"] = partitionKey1,
+				["category"] = "electronics",
 				["name"] = "First Item",
 				["value"] = 42,
 			};
@@ -150,7 +150,7 @@ namespace TimAbell.FakeCosmosDb.Tests.FakeContainerTests
 			var item2 = new JObject
 			{
 				["id"] = "duplicateId",
-				["partitionKey"] = partitionKey2,
+				["category"] = "books",
 				["name"] = "Second Item",
 				["value"] = 84,
 			};
@@ -159,8 +159,8 @@ namespace TimAbell.FakeCosmosDb.Tests.FakeContainerTests
 			fakeContainer.Documents.Add(item2);
 
 			// Act
-			var response1 = await fakeContainer.ReadItemAsync<JObject>("duplicateId", new PartitionKey(partitionKey1));
-			var response2 = await fakeContainer.ReadItemAsync<JObject>("duplicateId", new PartitionKey(partitionKey2));
+			var response1 = await fakeContainer.ReadItemAsync<JObject>("duplicateId", new PartitionKey("electronics"));
+			var response2 = await fakeContainer.ReadItemAsync<JObject>("duplicateId", new PartitionKey("books"));
 
 			// Assert
 			response1.Resource["name"].ToString().Should().Be("First Item");

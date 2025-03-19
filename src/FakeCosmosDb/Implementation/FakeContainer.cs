@@ -20,6 +20,9 @@ public class FakeContainer : Container
 	private readonly CosmosDbQueryExecutor _queryExecutor;
 	private readonly ICosmosDbPaginationManager _paginationManager = new CosmosDbPaginationManager();
 
+	// The partition key path for this container (e.g., "/id", "/category")
+	public string PartitionKeyPath { get; set; } = "/id";
+
 	public FakeContainer(ILogger logger = null)
 	{
 		_queryParser = new CosmosDbSqlQueryParser(logger);
