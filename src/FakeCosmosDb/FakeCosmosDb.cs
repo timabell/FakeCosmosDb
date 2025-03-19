@@ -22,7 +22,12 @@ namespace TimAbell.FakeCosmosDb;
 /// </summary>
 public class FakeCosmosDb : CosmosClient, ICosmosDb
 {
-	private readonly Dictionary<string, FakeContainer> _containers = new();
+	// Dictionary to store databases, keyed by database name
+	private readonly Dictionary<string, FakeDatabase> _databases = new();
+
+	// Default database name for ICosmosDb interface operations
+	private const string DefaultDatabaseName = "testdb";
+
 	private readonly CosmosDbSqlQueryParser _queryParser;
 	private readonly ILogger _logger;
 	private readonly CosmosDbQueryExecutor _queryExecutor;
@@ -43,21 +48,48 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		_paginationManager = new CosmosDbPaginationManager();
 	}
 
+	// Helper method to get or create a database
+	private FakeDatabase GetOrCreateDatabase(string databaseName)
+	{
+		if (_databases.TryGetValue(databaseName, out var existingDatabase))
+		{
+			return existingDatabase;
+		}
+
+		var newDatabase = new FakeDatabase(databaseName, _logger);
+		_databases[databaseName] = newDatabase;
+		return newDatabase;
+	}
+
+	// Helper method to get the default database
+	private FakeDatabase GetDefaultDatabase()
+	{
+		return GetOrCreateDatabase(DefaultDatabaseName);
+	}
+
 	public Task AddContainerAsync(string containerName)
 	{
-		if (!_containers.ContainsKey(containerName))
-			_containers[containerName] = new FakeContainer(_logger);
+		// Get the default database and create a container in it
+		var defaultDb = GetDefaultDatabase();
+		defaultDb.GetOrCreateContainer(containerName);
 		return Task.CompletedTask;
 	}
 
 	public Task AddItemAsync(string containerName, object entity)
 	{
-		if (!_containers.ContainsKey(containerName))
+		// Get the default database
+		var defaultDb = GetDefaultDatabase();
+
+		// Check if the container exists
+		var container = defaultDb.GetOrCreateContainer(containerName);
+		if (container == null)
+		{
 			throw new InvalidOperationException($"Container '{containerName}' does not exist.");
+		}
 
 		var json = JObject.FromObject(entity);
 		var id = json["id"]?.ToString() ?? throw new InvalidOperationException("Entity must have an 'id' property.");
-		_containers[containerName].Documents.Add(json);
+		container.Documents.Add(json);
 		return Task.CompletedTask;
 	}
 
@@ -67,8 +99,12 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 		try
 		{
+			// Get the default database
+			var defaultDb = GetDefaultDatabase();
+
 			// Get the container
-			if (!_containers.TryGetValue(containerName, out var container))
+			var container = defaultDb.GetOrCreateContainer(containerName);
+			if (container == null)
 			{
 				_logger?.LogWarning("Container '{containerName}' not found", containerName);
 				throw new InvalidOperationException($"Container '{containerName}' not found");
@@ -101,8 +137,15 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 	public Task<(IEnumerable<JObject> Results, string ContinuationToken)> QueryWithPaginationAsync(string containerName, string sql, int maxItemCount, string continuationToken = null)
 	{
-		if (!_containers.TryGetValue(containerName, out var container))
+		// Get the default database
+		var defaultDb = GetDefaultDatabase();
+
+		// Get the container
+		var container = defaultDb.GetOrCreateContainer(containerName);
+		if (container == null)
+		{
 			throw new InvalidOperationException($"Container '{containerName}' does not exist.");
+		}
 
 		var parsedQuery = _queryParser.Parse(sql);
 		var results = _queryExecutor.Execute(parsedQuery, container.Documents);
@@ -112,17 +155,22 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 	public override Container GetContainer(string databaseName, string containerId)
 	{
-		return new FakeContainer(); // todo: connect to stored containers
+		// Get or create the database
+		var database = GetOrCreateDatabase(databaseName);
+
+		// Get or create the container within that database
+		return database.GetOrCreateContainer(containerId);
 	}
 
 	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)
 	{
-		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(databaseName));
+		var database = GetOrCreateDatabase(databaseName);
+		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(database));
 	}
 
 	public override Database GetDatabase(string databaseName)
 	{
-		return new FakeDatabase(databaseName);
+		return GetOrCreateDatabase(databaseName);
 	}
 
 	protected override void Dispose(bool disposing)
@@ -135,9 +183,9 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 public class FakeDatabaseResponse : DatabaseResponse
 {
-	public FakeDatabaseResponse(string databaseName)
+	public FakeDatabaseResponse(FakeDatabase database)
 	{
-		Database = new FakeDatabase(databaseName);
+		Database = database;
 	}
 	public override Database Database { get; }
 }

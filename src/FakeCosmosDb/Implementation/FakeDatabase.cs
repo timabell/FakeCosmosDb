@@ -1,19 +1,39 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Fluent;
+using Microsoft.Extensions.Logging;
 
 namespace TimAbell.FakeCosmosDb.Implementation;
 
 public class FakeDatabase : Database
 {
-	public override string Id { get; }
+	public override string Id => _databaseName;
 	public override CosmosClient Client { get; }
 	private readonly string _databaseName;
+	private readonly ILogger _logger;
 
-	public FakeDatabase(string databaseName)
+	// Dictionary to store containers in this database, keyed by container ID
+	private readonly Dictionary<string, FakeContainer> _containers = new();
+
+	public FakeDatabase(string databaseName, ILogger logger = null)
 	{
 		_databaseName = databaseName;
+		_logger = logger;
+	}
+
+	// Get or create a container in this database
+	public FakeContainer GetOrCreateContainer(string containerId)
+	{
+		if (_containers.TryGetValue(containerId, out var existingContainer))
+		{
+			return existingContainer;
+		}
+
+		var newContainer = new FakeContainer(_logger);
+		_containers[containerId] = newContainer;
+		return newContainer;
 	}
 
 	public override Task<DatabaseResponse> ReadAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
@@ -73,7 +93,7 @@ public class FakeDatabase : Database
 
 	public override Container GetContainer(string id)
 	{
-		throw new System.NotImplementedException();
+		return GetOrCreateContainer(id);
 	}
 
 	public override Task<ContainerResponse> CreateContainerAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
