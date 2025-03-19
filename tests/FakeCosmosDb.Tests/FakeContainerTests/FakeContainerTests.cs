@@ -5,11 +5,12 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;
+using TimAbell.FakeCosmosDb.Implementation;
 using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace TimAbell.FakeCosmosDb.Tests
+namespace TimAbell.FakeCosmosDb.Tests.FakeContainerTests
 {
 	public class FakeContainerTests
 	{

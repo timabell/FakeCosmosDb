@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Sprache;
 
-namespace TimAbell.FakeCosmosDb.Parsing;
+namespace TimAbell.FakeCosmosDb.SqlParser;
 
 /// <summary>
 /// Grammar parser for CosmosDB SQL queries using Sprache.

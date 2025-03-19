@@ -5,7 +5,7 @@ using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace TimAbell.FakeCosmosDb.Tests;
+namespace TimAbell.FakeCosmosDb.Tests.AdapterTests;
 
 public class CosmosDbAdapterTests
 {

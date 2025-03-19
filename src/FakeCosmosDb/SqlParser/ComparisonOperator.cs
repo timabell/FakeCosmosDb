@@ -1,6 +1,6 @@
 using System;
 
-namespace TimAbell.FakeCosmosDb.Parsing
+namespace TimAbell.FakeCosmosDb.SqlParser
 {
 	public enum ComparisonOperator
 	{

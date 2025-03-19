@@ -9,9 +9,9 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Scripts;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
-using TimAbell.FakeCosmosDb.Parsing;
+using TimAbell.FakeCosmosDb.SqlParser;
 
-namespace TimAbell.FakeCosmosDb;
+namespace TimAbell.FakeCosmosDb.Implementation;
 
 public class FakeContainer : Container
 {

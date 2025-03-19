@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace TimAbell.FakeCosmosDb.Parsing;
+namespace TimAbell.FakeCosmosDb.SqlParser;
 
 /// <summary>
 /// Represents a parsed CosmosDB SQL query.

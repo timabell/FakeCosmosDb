@@ -6,19 +6,23 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
-using TimAbell.FakeCosmosDb.Parsing;
+using TimAbell.FakeCosmosDb.Implementation;
+using TimAbell.FakeCosmosDb.SqlParser;
 
 namespace TimAbell.FakeCosmosDb;
 
 /// <summary>
 /// Fake CosmosDb implementation that stores data in memory and allows round-trip of stored data.
 /// Can be swapped in in two ways:
-/// - Depend on the ICosmosDb interface and inject this class in place of the real CosmosDb, this is clearer but requires more changes to production code.
-/// - Use the fact that this class inherits from the real CosmosClient class and use it as a drop-in replacement for the real CosmosClient.
+/// 1. Depend on the ICosmosDb interface and inject this class in place of the real CosmosDb, this is clearer but requires more changes to production code.
+/// 2. Use the fact that this class inherits from the real CosmosClient class and use it as a drop-in replacement for the real CosmosClient.
+/// It's a bit icky that we inherit from CosmosClient, but it allows us to be a drop-in replacement for existing production code that already depends on
+/// CosmosClient without requiring more code changes. It would be nice if we could have added the missing interface to CosmosClient, but typically microsoft didn't
+/// provide one and c# doesn't let you add interfaces to classes you don't own (unlike golang).
 /// </summary>
 public class FakeCosmosDb : CosmosClient, ICosmosDb
 {
-	private readonly Dictionary<string, CosmosDbContainer> _containers = new();
+	private readonly Dictionary<string, InMemoryContainer> _containers = new();
 	private readonly CosmosDbSqlQueryParser _queryParser;
 	private readonly ILogger _logger;
 	private readonly CosmosDbQueryExecutor _queryExecutor;
@@ -39,7 +43,7 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 	public Task AddContainerAsync(string containerName)
 	{
 		if (!_containers.ContainsKey(containerName))
-			_containers[containerName] = new CosmosDbContainer(_logger);
+			_containers[containerName] = new InMemoryContainer(_logger);
 		return Task.CompletedTask;
 	}
 
@@ -99,7 +103,7 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 	public override Container GetContainer(string databaseName, string containerId)
 	{
-		return new FakeContainer();
+		return new FakeContainer(); // todo: connect to stored containers
 	}
 
 	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)

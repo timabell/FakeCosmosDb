@@ -4,7 +4,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
-namespace TimAbell.FakeCosmosDb.Parsing;
+namespace TimAbell.FakeCosmosDb.SqlParser;
 
 public class CosmosDbSqlQueryParser
 {
