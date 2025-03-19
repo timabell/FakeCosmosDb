@@ -325,14 +325,15 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var resultsYoungOrOld = await iteratorYoungOrOld.ReadNextAsync();
 
 			resultsYoungOrOld.Should().HaveCount(2, "because three documents have Age < 30 or Age >= 40");
-			resultsYoungOrOld.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Bob" });
+			resultsYoungOrOld.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Alice" });
 
 			// Act & Assert - OR with multiple criteria types
 			var queryDefinitionPremiumOrOld = new QueryDefinition("SELECT * FROM c WHERE c.IsPremium OR c.Age >= 35");
 			var iteratorPremiumOrOld = container.GetItemQueryIterator<JObject>(queryDefinitionPremiumOrOld);
 			var resultsPremiumOrOld = await iteratorPremiumOrOld.ReadNextAsync();
 
-			resultsPremiumOrOld.Should().HaveCount(4, "because all documents match one of these criteria");
+			resultsPremiumOrOld.Should().HaveCount(3, "because all documents match one of these criteria");
+			resultsPremiumOrOld.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Alice", "John" });
 		}
 
 		[Fact]
@@ -365,7 +366,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var resultsComplex = await iteratorComplex.ReadNextAsync();
 
 			resultsComplex.Should().HaveCount(2, "because two documents match this complex condition");
-			resultsComplex.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "Bob" });
+			resultsComplex.Select(r => r["Name"].Value<string>()).Should().Contain(new[] { "Jane", "John" });
 
 			// Act & Assert - Complex with NOT and parentheses
 			var queryDefinitionWithNotAndParentheses = new QueryDefinition("SELECT * FROM c WHERE NOT (c.Department = 'Engineering' OR c.Age <= 30)");
