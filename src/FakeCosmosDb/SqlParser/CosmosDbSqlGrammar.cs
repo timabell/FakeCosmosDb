@@ -92,7 +92,7 @@ public static class CosmosDbSqlGrammar
 
 	// Parameter expression (@param)
 	private static readonly Parser<Expression> ParameterExpr =
-		ParameterIdentifier.Token().Select(paramName => (Expression)new ParameterExpression(paramName));
+		ParameterIdentifier.Token().Select(paramName => (Expression)new ParameterExpression(paramName.Substring(1))); // Strip the @ symbol
 
 	// Function call expressions (CONTAINS, STARTSWITH, etc.)
 	private static Parser<Expression> FunctionCallExpr(string name)
