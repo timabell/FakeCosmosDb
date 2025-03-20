@@ -274,6 +274,16 @@ public class CosmosDbSqlQueryParser
 					Value = JToken.FromObject(rightConst.Value)
 				});
 			}
+			else if (comparison.Left is PropertyExpression leftPropParam && comparison.Right is ParameterExpression rightParam)
+			{
+				// Handle property = @parameter
+				conditions.Add(new WhereCondition
+				{
+					PropertyPath = leftPropParam.PropertyPath,
+					Operator = GetComparisonOperator(comparison.Operator),
+					ParameterName = rightParam.ParameterName
+				});
+			}
 			else if (comparison.Right is PropertyExpression rightProp && comparison.Left is ConstantExpression leftConst)
 			{
 				// Handle reverse order (value = property)
@@ -283,6 +293,17 @@ public class CosmosDbSqlQueryParser
 					PropertyPath = rightProp.PropertyPath,
 					Operator = GetComparisonOperator(reversedOp),
 					Value = JToken.FromObject(leftConst.Value)
+				});
+			}
+			else if (comparison.Right is PropertyExpression rightPropParam && comparison.Left is ParameterExpression leftParam)
+			{
+				// Handle reverse order (@parameter = property)
+				var reversedOp = GetReversedOperator(comparison.Operator);
+				conditions.Add(new WhereCondition
+				{
+					PropertyPath = rightPropParam.PropertyPath,
+					Operator = GetComparisonOperator(reversedOp),
+					ParameterName = leftParam.ParameterName
 				});
 			}
 		}
@@ -559,6 +580,11 @@ public class WhereCondition
 	/// The value to compare with.
 	/// </summary>
 	public JToken Value { get; set; }
+
+	/// <summary>
+	/// The parameter name to compare with.
+	/// </summary>
+	public string ParameterName { get; set; }
 
 	/// <summary>
 	/// For CONTAINS function, indicates whether the search should be case-insensitive.

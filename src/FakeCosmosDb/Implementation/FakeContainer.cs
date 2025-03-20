@@ -4,8 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Globalization;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Scripts;
 using Microsoft.Extensions.Logging;
@@ -453,8 +455,10 @@ public class FakeContainer : Container
 			if (!_queryExecuted)
 			{
 				var query = _queryDefinition?.QueryText;
+				var parameters = _queryDefinition?.GetQueryParameters();
+
 				var parsedQuery = _container._queryParser.Parse(query);
-				_queryResults = _queryExecutor.Execute(parsedQuery, _store);
+				_queryResults = _queryExecutor.Execute(parsedQuery, _store, parameters);
 				_queryExecuted = true;
 
 				// If we have a pagination manager and max items count, use it to get the correct page
@@ -520,6 +524,45 @@ public class FakeContainer : Container
 
 			// Fallback empty response
 			return new FakeFeedResponse<T>(new List<T>(), null);
+		}
+
+		// Helper method to convert parameter values to SQL-compatible string representations
+		private string GetParameterReplacementString(object value)
+		{
+			if (value == null)
+			{
+				return "null";
+			}
+
+			// Handle different types appropriately
+			if (value is string stringValue)
+			{
+				return $"'{EscapeSqlString(stringValue)}'";
+			}
+			else if (value is DateTime dateTimeValue)
+			{
+				return $"'{dateTimeValue:yyyy-MM-ddTHH:mm:ss.FFFFFFF}'";
+			}
+			else if (value is bool boolValue)
+			{
+				return boolValue ? "true" : "false";
+			}
+			else if (value is decimal || value is double || value is float)
+			{
+				// Ensure decimal point is included for numeric values
+				return Convert.ToString(value, CultureInfo.InvariantCulture);
+			}
+			else
+			{
+				// Handle other types like int, long, etc.
+				return Convert.ToString(value, CultureInfo.InvariantCulture);
+			}
+		}
+
+		// Helper method to escape single quotes in SQL strings
+		private string EscapeSqlString(string input)
+		{
+			return input?.Replace("'", "''");
 		}
 	}
 

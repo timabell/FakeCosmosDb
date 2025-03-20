@@ -584,4 +584,65 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		result.WhereConditions[0].PropertyPath.Should().Be("c.id");
 		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Equals);
 	}
+
+	[Fact]
+	public void ShouldParseQueryWithParameterInWhereClause()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE c.age > @ageParam";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.SprachedSqlAst.Where.Condition.Should().BeOfType<BinaryExpression>();
+
+		var binaryExpression = (BinaryExpression)result.SprachedSqlAst.Where.Condition;
+		binaryExpression.Operator.Should().Be(BinaryOperator.GreaterThan);
+		binaryExpression.Left.Should().BeOfType<PropertyExpression>();
+		binaryExpression.Right.Should().BeOfType<ParameterExpression>();
+
+		var parameterExpression = (ParameterExpression)binaryExpression.Right;
+		parameterExpression.ParameterName.Should().Be("ageParam");
+	}
+
+	[Fact]
+	public void ShouldParseQueryWithMultipleParametersInWhereClause()
+	{
+		// Arrange
+		var sql = "SELECT * FROM c WHERE c.age > @minAge AND c.age <= @maxAge";
+
+		// Act
+		var result = _parser.Parse(sql);
+
+		// Assert
+		result.PropertyPaths.Should().ContainSingle("*");
+		result.FromName.Should().Be("c");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.SprachedSqlAst.Where.Condition.Should().BeOfType<BinaryExpression>();
+
+		var andExpression = (BinaryExpression)result.SprachedSqlAst.Where.Condition;
+		andExpression.Operator.Should().Be(BinaryOperator.And);
+
+		var leftExpression = (BinaryExpression)andExpression.Left;
+		leftExpression.Operator.Should().Be(BinaryOperator.GreaterThan);
+		leftExpression.Left.Should().BeOfType<PropertyExpression>();
+		leftExpression.Right.Should().BeOfType<ParameterExpression>();
+
+		var rightExpression = (BinaryExpression)andExpression.Right;
+		rightExpression.Operator.Should().Be(BinaryOperator.LessThanOrEqual);
+		rightExpression.Left.Should().BeOfType<PropertyExpression>();
+		rightExpression.Right.Should().BeOfType<ParameterExpression>();
+
+		var minAgeParam = (ParameterExpression)leftExpression.Right;
+		minAgeParam.ParameterName.Should().Be("minAge");
+
+		var maxAgeParam = (ParameterExpression)rightExpression.Right;
+		maxAgeParam.ParameterName.Should().Be("maxAge");
+	}
 }

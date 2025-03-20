@@ -34,6 +34,16 @@ public static class CosmosDbSqlGrammar
 			)
 		);
 
+	// Parameter identifier (e.g. @param)
+	public static readonly Parser<string> ParameterIdentifier =
+		Parse.Char('@').Then(_ =>
+			Parse.Letter.AtLeastOnce().Text().Then(first =>
+				Parse.LetterOrDigit.Or(Parse.Char('_')).Many().Text().Select(rest =>
+					"@" + first + rest
+				)
+			)
+		);
+
 	// Property path (e.g., "c.Address.City")
 	public static readonly Parser<string> PropertyPath =
 		Identifier.DelimitedBy(Parse.Char('.')).Select(parts => string.Join(".", parts));
@@ -79,6 +89,10 @@ public static class CosmosDbSqlGrammar
 
 	private static readonly Parser<Expression> PropertyExpr =
 		PropertyPath.Token().Select(path => (Expression)new PropertyExpression(path));
+
+	// Parameter expression (@param)
+	private static readonly Parser<Expression> ParameterExpr =
+		ParameterIdentifier.Token().Select(paramName => (Expression)new ParameterExpression(paramName.Substring(1))); // Strip the @ symbol
 
 	// Function call expressions (CONTAINS, STARTSWITH, etc.)
 	private static Parser<Expression> FunctionCallExpr(string name)
@@ -143,10 +157,11 @@ public static class CosmosDbSqlGrammar
 			Parse.Ref(() => AtomExpr)
 				.Select(expr => (Expression)new UnaryExpression(UnaryOperator.Not, expr)));
 
-	// Atom expressions (constants, property refs, parenthesized expressions)
+	// Atom expressions (constants, property refs, parameters, parenthesized expressions)
 	private static readonly Parser<Expression> AtomExpr =
 		ConstantExpr
 		.Or(FunctionExpr)
+		.Or(ParameterExpr)
 		.Or(PropertyExpr)
 		.Or(Parse.Char('(').Token()
 			.Then(_ => ExpressionRef)

@@ -18,7 +18,7 @@ public class CosmosDbQueryExecutor
 		_logger = logger;
 	}
 
-	public IEnumerable<JObject> Execute(ParsedQuery query, List<JObject> store)
+	public IEnumerable<JObject> Execute(ParsedQuery query, List<JObject> store, IReadOnlyList<(string Name, object Value)> parameters)
 	{
 		if (_logger != null)
 		{
@@ -50,7 +50,7 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Applying WHERE from AST");
 			}
 
-			filtered = filtered.Where(e => ApplyWhere(e, query.SprachedSqlAst.Where.Condition));
+			filtered = filtered.Where(e => ApplyWhere(e, query.SprachedSqlAst.Where.Condition, parameters));
 		}
 		else if (query.WhereConditions != null && query.WhereConditions.Count > 0)
 		{
@@ -728,11 +728,11 @@ public class CosmosDbQueryExecutor
 		current[parts[parts.Length - 1]] = value;
 	}
 
-	private bool ApplyWhere(JObject item, Expression condition)
+	private bool ApplyWhere(JObject item, Expression condition, IReadOnlyList<(string Name, object Value)> parameters)
 	{
 		if (condition == null) return true;
 
-		var result = EvaluateExpression(item, condition);
+		var result = EvaluateExpression(item, condition, parameters);
 
 		// Convert the result to a boolean if it's not already
 		bool boolResult;
@@ -1023,7 +1023,7 @@ public class CosmosDbQueryExecutor
 		return GetComparisonResult(comparison, operatorEnum);
 	}
 
-	private bool EvaluateExpression(JObject item, Expression expression)
+	private bool EvaluateExpression(JObject item, Expression expression, IReadOnlyList<(string Name, object Value)> parameters)
 	{
 		if (_logger != null)
 		{
@@ -1032,8 +1032,8 @@ public class CosmosDbQueryExecutor
 
 		if (expression is BinaryExpression binary)
 		{
-			var leftValue = EvaluateValue(item, binary.Left);
-			var rightValue = EvaluateValue(item, binary.Right);
+			var leftValue = EvaluateValue(item, binary.Left, parameters);
+			var rightValue = EvaluateValue(item, binary.Right, parameters);
 
 			if (_logger != null)
 			{
@@ -1345,10 +1345,10 @@ public class CosmosDbQueryExecutor
 					return CompareValues(leftValue, rightValue) <= 0;
 
 				case BinaryOperator.And:
-					return EvaluateExpression(item, binary.Left) && EvaluateExpression(item, binary.Right);
+					return EvaluateExpression(item, binary.Left, parameters) && EvaluateExpression(item, binary.Right, parameters);
 
 				case BinaryOperator.Or:
-					return EvaluateExpression(item, binary.Left) || EvaluateExpression(item, binary.Right);
+					return EvaluateExpression(item, binary.Left, parameters) || EvaluateExpression(item, binary.Right, parameters);
 
 				case BinaryOperator.Between:
 					if (binary.Left is PropertyExpression propExpression && binary.Right is BetweenExpression betweenExpr)
@@ -1360,8 +1360,8 @@ public class CosmosDbQueryExecutor
 						JToken jPropValue = propValue as JToken ?? JToken.FromObject(propValue);
 
 						// Get the lower and upper bounds
-						var lowerBound = EvaluateValue(item, betweenExpr.LowerBound);
-						var upperBound = EvaluateValue(item, betweenExpr.UpperBound);
+						var lowerBound = EvaluateValue(item, betweenExpr.LowerBound, parameters);
+						var upperBound = EvaluateValue(item, betweenExpr.UpperBound, parameters);
 
 						if (_logger != null)
 						{
@@ -1458,12 +1458,45 @@ public class CosmosDbQueryExecutor
 				return boolValue;
 			}
 
+			// For non-boolean property expressions in a boolean context, check if not null
 			return value != null;
+		}
+
+		if (expression is ParameterExpression param)
+		{
+			// Look up the parameter value in the parameters collection
+			if (parameters != null)
+			{
+				var paramMatch = parameters.FirstOrDefault(p => p.Name == param.ParameterName);
+				if (paramMatch != default)
+				{
+					if (_logger != null)
+					{
+						_logger.LogDebug("Found parameter value for {paramName}: {value}",
+							param.ParameterName, paramMatch.Value?.ToString() ?? "null");
+					}
+
+					// Convert to boolean context if needed
+					if (paramMatch.Value is bool boolValue)
+					{
+						return boolValue;
+					}
+					return paramMatch.Value != null;
+				}
+			}
+
+			if (_logger != null)
+			{
+				_logger.LogWarning("Parameter not found in supplied parameters: {paramName}", param.ParameterName);
+			}
+
+			// Parameters in boolean context should evaluate to false when not found
+			return false;
 		}
 
 		if (expression is FunctionCallExpression func)
 		{
-			return EvaluateFunction(item, func);
+			return EvaluateFunction(item, func, parameters);
 		}
 		else if (expression is UnaryExpression unary)
 		{
@@ -1472,7 +1505,7 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Evaluating unary expression: {op}", unary.Operator);
 			}
 
-			object operandValue = EvaluateExpression(item, unary.Operand);
+			object operandValue = EvaluateExpression(item, unary.Operand, parameters);
 
 			switch (unary.Operator)
 			{
@@ -1500,7 +1533,7 @@ public class CosmosDbQueryExecutor
 		throw new NotImplementedException($"Expression type {expression.GetType().Name} not implemented");
 	}
 
-	private object EvaluateValue(JObject item, Expression expression)
+	private object EvaluateValue(JObject item, Expression expression, IReadOnlyList<(string Name, object Value)> parameters = null)
 	{
 		if (_logger != null)
 		{
@@ -1538,6 +1571,33 @@ public class CosmosDbQueryExecutor
 			return propValue;
 		}
 
+		if (expression is ParameterExpression param)
+		{
+			// Look up the parameter value in the parameters collection
+			if (parameters != null)
+			{
+				var paramMatch = parameters.FirstOrDefault(p => p.Name == $"@{param.ParameterName}");
+				if (paramMatch != default)
+				{
+					if (_logger != null)
+					{
+						_logger.LogDebug("Found parameter value for {paramName} in value context: {value}",
+							param.ParameterName, paramMatch.Value?.ToString() ?? "null");
+					}
+					return paramMatch.Value;
+				}
+			}
+
+			if (_logger != null)
+			{
+				_logger.LogWarning("Parameter not found in supplied parameters when evaluated as value: {paramName}", param.ParameterName);
+			}
+
+			// Parameters in value context should be treated as DBNull when not found
+			// This ensures comparisons with them will fail predictably
+			return DBNull.Value;
+		}
+
 		if (expression is FunctionCallExpression func)
 		{
 			if (_logger != null)
@@ -1545,13 +1605,13 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Evaluating function: {name}", func.Name);
 			}
 
-			return EvaluateFunction(item, func);
+			return EvaluateFunction(item, func, parameters);
 		}
 
 		if (expression is BinaryExpression binary)
 		{
 			// For binary expressions in a value context, we evaluate them as boolean
-			bool result = EvaluateExpression(item, binary);
+			bool result = EvaluateExpression(item, binary, parameters);
 			if (_logger != null)
 			{
 				_logger.LogDebug("Binary expression evaluated to: {result}", result);
@@ -1562,7 +1622,7 @@ public class CosmosDbQueryExecutor
 		if (expression is UnaryExpression unary)
 		{
 			// For unary expressions in a value context, we evaluate them as boolean
-			bool result = EvaluateExpression(item, unary);
+			bool result = EvaluateExpression(item, unary, parameters);
 			if (_logger != null)
 			{
 				_logger.LogDebug("Unary expression evaluated to: {result}", result);
@@ -1573,8 +1633,8 @@ public class CosmosDbQueryExecutor
 		if (expression is BetweenExpression betweenExpression)
 		{
 			// For a BetweenExpression, return an array with the lower and upper bounds
-			var lowerBound = EvaluateValue(item, betweenExpression.LowerBound);
-			var upperBound = EvaluateValue(item, betweenExpression.UpperBound);
+			var lowerBound = EvaluateValue(item, betweenExpression.LowerBound, parameters);
+			var upperBound = EvaluateValue(item, betweenExpression.UpperBound, parameters);
 
 			if (_logger != null)
 			{
@@ -1589,11 +1649,12 @@ public class CosmosDbQueryExecutor
 		throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
 	}
 
-	private bool EvaluateFunction(JObject item, FunctionCallExpression function)
+	private bool EvaluateFunction(JObject item, FunctionCallExpression function, IReadOnlyList<(string Name, object Value)> parameters = null)
 	{
 		if (_logger != null)
 		{
-			_logger.LogDebug("Evaluating function: {name} with {count} arguments", function.Name, function.Arguments.Count);
+			_logger.LogDebug("Evaluating function: {name} with {count} arguments", 
+				function.Name, function.Arguments.Count);
 		}
 
 		switch (function.Name.ToUpperInvariant())
@@ -1604,8 +1665,8 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("CONTAINS function requires 2 or 3 arguments");
 				}
 
-				var containsPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
-				var containsSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+				var containsPropertyValue = EvaluateValue(item, function.Arguments[0], parameters)?.ToString();
+				var containsSearchValue = EvaluateValue(item, function.Arguments[1], parameters)?.ToString();
 
 				// Third argument is an optional boolean for case insensitivity
 				// When set to true, CONTAINS performs a case-insensitive search
@@ -1613,7 +1674,7 @@ public class CosmosDbQueryExecutor
 				var ignoreCase = false;
 				if (function.Arguments.Count == 3)
 				{
-					var caseInsensitiveArg = EvaluateValue(item, function.Arguments[2]);
+					var caseInsensitiveArg = EvaluateValue(item, function.Arguments[2], parameters);
 					if (caseInsensitiveArg != null && bool.TryParse(caseInsensitiveArg.ToString(), out bool ignoreResult))
 					{
 						ignoreCase = ignoreResult;
@@ -1635,8 +1696,8 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("STARTSWITH function requires exactly 2 arguments");
 				}
 
-				var startsWithPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
-				var startsWithSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+				var startsWithPropertyValue = EvaluateValue(item, function.Arguments[0], parameters)?.ToString();
+				var startsWithSearchValue = EvaluateValue(item, function.Arguments[1], parameters)?.ToString();
 
 				if (startsWithPropertyValue == null || startsWithSearchValue == null)
 				{
@@ -1651,8 +1712,8 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("ARRAY_CONTAINS function requires exactly 2 arguments");
 				}
 
-				var arrayValue = EvaluateValue(item, function.Arguments[0]);
-				var searchValue = EvaluateValue(item, function.Arguments[1]);
+				var arrayValue = EvaluateValue(item, function.Arguments[0], parameters);
+				var searchValue = EvaluateValue(item, function.Arguments[1], parameters);
 
 				if (arrayValue == null || searchValue == null)
 				{
@@ -1739,15 +1800,17 @@ public class CosmosDbQueryExecutor
 					return isNull;
 				}
 
-				var value = EvaluateValue(item, function.Arguments[0]);
-				bool result = value == null;
+				var argValue = EvaluateValue(item, function.Arguments[0], parameters);
+				bool argIsNull = argValue == null || 
+				                 argValue == DBNull.Value || 
+				                 (argValue is JValue jv && jv.Type == JTokenType.Null);
 
 				if (_logger != null)
 				{
-					_logger.LogDebug("IS_NULL: Value is {result}", result ? "null" : "not null");
+					_logger.LogDebug("IS_NULL: Value is {result}", argIsNull ? "null" : "not null");
 				}
 
-				return result;
+				return argIsNull;
 
 			case "IS_DEFINED":
 				if (function.Arguments.Count != 1)
@@ -1755,23 +1818,32 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("IS_DEFINED function requires exactly 1 argument");
 				}
 
-				if (function.Arguments[0] is PropertyExpression propDefined)
+				if (function.Arguments[0] is PropertyExpression isDefinedPropExpr)
 				{
-					var token = GetPropertyByPath(item, propDefined.PropertyPath);
+					var token = GetPropertyByPath(item, isDefinedPropExpr.PropertyPath);
 					bool isDefined = token != null;
 
 					if (_logger != null)
 					{
-						_logger.LogDebug("IS_DEFINED: Property '{path}' is {result}", propDefined.PropertyPath, isDefined ? "defined" : "not defined");
+						_logger.LogDebug("IS_DEFINED: Property '{path}' is {result}", 
+							isDefinedPropExpr.PropertyPath, isDefined ? "defined" : "not defined");
 					}
 
 					return isDefined;
 				}
 
-				throw new ArgumentException("IS_DEFINED function requires a property expression as its argument");
+				var isDefinedArgValue = EvaluateValue(item, function.Arguments[0], parameters);
+				bool isArgDefined = isDefinedArgValue != null && isDefinedArgValue != DBNull.Value;
+
+				if (_logger != null)
+				{
+					_logger.LogDebug("IS_DEFINED: Value is {result}", isArgDefined ? "defined" : "not defined");
+				}
+
+				return isArgDefined;
 
 			default:
-				throw new NotImplementedException($"Function {function.Name} not implemented");
+				throw new NotImplementedException($"Function {function.Name} is not implemented");
 		}
 	}
 }
