@@ -22,20 +22,6 @@ public class CosmosDbQueryExecutor
 		{
 			_logger.LogDebug("Executing query on {count} documents", store.Count);
 			_logger.LogDebug("Query details - AST: {ast}", query.SprachedSqlAst != null ? "Present" : "null");
-
-			if (query.WhereConditions != null)
-			{
-				_logger.LogDebug("WhereConditions count: {count}", query.WhereConditions.Count);
-				foreach (var condition in query.WhereConditions)
-				{
-					_logger.LogDebug("Condition: {property} {operator} {value}",
-						condition.PropertyPath, condition.Operator, condition.Value);
-				}
-			}
-			else
-			{
-				_logger.LogDebug("No WhereConditions present in ParsedQuery");
-			}
 		}
 
 		var filtered = store.AsQueryable();
@@ -49,24 +35,6 @@ public class CosmosDbQueryExecutor
 			}
 
 			filtered = filtered.Where(e => ApplyWhere(e, query.SprachedSqlAst.Where.Condition, parameters));
-		}
-		else if (query.WhereConditions != null && query.WhereConditions.Count > 0)
-		{
-			if (_logger != null)
-			{
-				_logger.LogDebug("Applying WHERE from WhereConditions");
-			}
-
-			// Remove the statement body from the lambda expression
-			filtered = filtered.Where(e => EvaluateWhereConditions(e, query.WhereConditions));
-
-			// Log outside the expression tree if needed
-			if (_logger != null && filtered.Any())
-			{
-				var firstItem = filtered.First();
-				_logger.LogDebug("Evaluated document {id} against WHERE conditions: {result}",
-					firstItem["id"], EvaluateWhereConditions(firstItem, query.WhereConditions));
-			}
 		}
 		else
 		{
@@ -102,30 +70,6 @@ public class CosmosDbQueryExecutor
 				}
 			}
 		}
-		else if (query.OrderBy != null && query.OrderBy.Count > 0)
-		{
-			if (_logger != null)
-			{
-				_logger.LogDebug("Applying ORDER BY from ParsedQuery.OrderBy");
-			}
-
-			foreach (var orderBy in query.OrderBy)
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("ORDER BY {property} {direction}", orderBy.PropertyPath, orderBy.Direction);
-				}
-
-				if (orderBy.Direction == SortDirection.Descending)
-				{
-					filtered = filtered.OrderByDescending(e => GetPropertyValue(e, orderBy.PropertyPath));
-				}
-				else
-				{
-					filtered = filtered.OrderBy(e => GetPropertyValue(e, orderBy.PropertyPath));
-				}
-			}
-		}
 
 		var results = filtered.ToList();
 		if (_logger != null)
@@ -143,15 +87,6 @@ public class CosmosDbQueryExecutor
 
 			results = results.Take(query.SprachedSqlAst.Select.Top.Value).ToList();
 		}
-		else if (query.TopValue > 0)
-		{
-			if (_logger != null)
-			{
-				_logger.LogDebug("Applying TOP {top} from ParsedQuery.TopValue", query.TopValue);
-			}
-
-			results = results.Take(query.TopValue).ToList();
-		}
 
 		// Apply LIMIT if specified
 		if (query.SprachedSqlAst != null && query.SprachedSqlAst.Limit != null)
@@ -162,15 +97,6 @@ public class CosmosDbQueryExecutor
 			}
 
 			results = results.Take(query.SprachedSqlAst.Limit.Value).ToList();
-		}
-		else if (query.Limit > 0)
-		{
-			if (_logger != null)
-			{
-				_logger.LogDebug("Applying LIMIT {limit} from ParsedQuery.Limit", query.Limit);
-			}
-
-			results = results.Take(query.Limit).ToList();
 		}
 
 		if (_logger != null)
@@ -190,301 +116,7 @@ public class CosmosDbQueryExecutor
 			return ApplyProjection(results, properties);
 		}
 
-		if (query.PropertyPaths != null && query.PropertyPaths.Count > 0 && !query.PropertyPaths.Contains("*"))
-		{
-			if (_logger != null)
-			{
-				_logger.LogDebug("Applying projection for properties: {properties}", string.Join(", ", query.PropertyPaths));
-			}
-
-			return ApplyProjection(results, query.PropertyPaths);
-		}
-
 		return results;
-	}
-
-	// Helper method to evaluate WHERE conditions with detailed logging
-	private bool EvaluateWhereConditions(JObject document, List<WhereCondition> conditions)
-	{
-		if (conditions == null || conditions.Count == 0)
-		{
-			return true;
-		}
-
-		foreach (var condition in conditions)
-		{
-			var propertyValue = GetPropertyByPath(document, condition.PropertyPath);
-			if (_logger != null)
-			{
-				_logger.LogDebug("Checking {property} {operator} {value}",
-					condition.PropertyPath, condition.Operator, condition.Value);
-				_logger.LogDebug("Document property value: {value} (Type: {type})",
-					propertyValue?.ToString() ?? "null", propertyValue != null ? propertyValue.Type.ToString() : "null");
-			}
-
-			var matches = EvaluateCondition(propertyValue, condition.Operator, condition.Value, condition.IgnoreCase ?? false);
-			if (_logger != null)
-			{
-				_logger.LogDebug("Condition result: {result}", matches);
-			}
-
-			if (!matches)
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-
-	private bool EvaluateCondition(JToken propertyValue, ComparisonOperator op, JToken conditionValue, bool ignoreCase)
-	{
-		// Handle null property values
-		if (propertyValue == null)
-		{
-			if (_logger != null)
-			{
-				_logger.LogDebug("Property value is null, condition fails");
-			}
-
-			return false;
-		}
-
-		// Convert the condition value to a comparable format
-		object conditionObj = null;
-		if (conditionValue != null)
-		{
-			// Extract primitive value from JToken
-			switch (conditionValue.Type)
-			{
-				case JTokenType.String:
-					conditionObj = conditionValue.Value<string>();
-					break;
-				case JTokenType.Integer:
-					conditionObj = conditionValue.Value<int>();
-					break;
-				case JTokenType.Float:
-					conditionObj = conditionValue.Value<double>();
-					break;
-				case JTokenType.Boolean:
-					conditionObj = conditionValue.Value<bool>();
-					break;
-				default:
-					conditionObj = conditionValue.ToString();
-					break;
-			}
-
-			if (_logger != null)
-			{
-				_logger.LogDebug("Extracted condition value: {value} (Type: {type})",
-					conditionObj, conditionObj?.GetType().Name ?? "null");
-				_logger.LogDebug("Property value for comparison: {value} (Type: {type})",
-					propertyValue.ToString(), propertyValue.Type.ToString());
-			}
-		}
-
-		if (_logger != null)
-		{
-			_logger.LogDebug("Comparing using operator: {operator}", op);
-			_logger.LogDebug("Condition value after extraction: {value} (Type: {type})",
-				conditionObj, conditionObj?.GetType().Name ?? "null");
-		}
-
-		// Handle different operators
-		switch (op)
-		{
-			case ComparisonOperator.Equals:
-				if (propertyValue.Type == JTokenType.String && conditionObj is string stringValue)
-				{
-					string propStringValue = propertyValue.Value<string>();
-					var result = string.Equals(propStringValue, stringValue, StringComparison.OrdinalIgnoreCase);
-					if (_logger != null)
-					{
-						_logger.LogDebug("String equality check: '{property}' = '{value}' => {result}",
-							propStringValue, stringValue, result);
-					}
-
-					return result;
-				}
-
-				var equality = JToken.DeepEquals(propertyValue, JToken.FromObject(conditionObj));
-				if (_logger != null)
-				{
-					_logger.LogDebug("Deep equality check: '{property}' = '{value}' => {result}",
-						propertyValue.ToString(), conditionObj?.ToString() ?? "null", equality);
-				}
-
-				return equality;
-
-			case ComparisonOperator.NotEquals:
-				if (conditionObj is JToken jToken)
-				{
-					return !JToken.DeepEquals(propertyValue, jToken);
-				}
-				return !JToken.DeepEquals(propertyValue, JToken.FromObject(conditionObj));
-
-			case ComparisonOperator.GreaterThan:
-				return CompareValues(propertyValue, conditionObj) > 0;
-
-			case ComparisonOperator.GreaterThanOrEqual:
-				return CompareValues(propertyValue, conditionObj) >= 0;
-
-			case ComparisonOperator.LessThan:
-				return CompareValues(propertyValue, conditionObj) < 0;
-
-			case ComparisonOperator.LessThanOrEqual:
-				return CompareValues(propertyValue, conditionObj) <= 0;
-
-			case ComparisonOperator.StringContains:
-				var containsPropertyValue = propertyValue?.ToString();
-				var containsSearchValue = conditionObj?.ToString();
-
-				if (containsPropertyValue == null || containsSearchValue == null)
-				{
-					_logger?.LogDebug("String contains comparison: one of the values is null");
-					return false;
-				}
-
-				var containsResult = ignoreCase
-					? containsPropertyValue.IndexOf(containsSearchValue, StringComparison.OrdinalIgnoreCase) >= 0
-					: containsPropertyValue.Contains(containsSearchValue);
-
-				if (_logger != null)
-				{
-					_logger.LogDebug("String contains comparison: '{left}' contains '{right}' (ignoreCase: {ignoreCase}) = {result}",
-						containsPropertyValue, containsSearchValue, ignoreCase, containsResult);
-				}
-
-				return containsResult;
-
-			case ComparisonOperator.StringStartsWith:
-				if (propertyValue.Type == JTokenType.String && conditionObj is string startsWithValue)
-				{
-					return propertyValue.Value<string>().StartsWith(startsWithValue, StringComparison.OrdinalIgnoreCase);
-				}
-
-				return false;
-
-			case ComparisonOperator.IsDefined:
-				return propertyValue != null;
-
-			case ComparisonOperator.ArrayContains:
-				if (propertyValue is JArray array)
-				{
-					// Extract the value to search for
-					object searchValue = conditionObj;
-
-					// If the search value is null, we can't meaningfully search for it
-					if (searchValue == null)
-					{
-						return false;
-					}
-
-					// Convert the search value to string for comparison
-					string searchString = searchValue.ToString();
-
-					// Check each element in the array
-					foreach (var element in array)
-					{
-						if (element != null && element.ToString() == searchString)
-						{
-							return true;
-						}
-					}
-
-					return false;
-				}
-
-				// If propValue is not an array, return false
-				return false;
-
-			case ComparisonOperator.Between:
-				if (conditionObj is not JArray arrayBetween)
-				{
-					throw new InvalidOperationException("BETWEEN operator requires an array of values");
-				}
-
-				if (arrayBetween.Count != 2)
-				{
-					throw new InvalidOperationException($"BETWEEN operator requires exactly 2 values, but found {arrayBetween.Count}");
-				}
-
-				// Extract the values to compare against
-				var lowerBound = arrayBetween[0];
-				var upperBound = arrayBetween[1];
-
-				// Get the property value as a JToken if it's not already
-				JToken jPropertyValue = propertyValue as JToken ?? JToken.FromObject(propertyValue);
-
-				// Handle different types of JToken values
-				if (jPropertyValue.Type == JTokenType.Integer)
-				{
-					int value = jPropertyValue.Value<int>();
-					return value >= lowerBound.Value<int>() && value <= upperBound.Value<int>();
-				}
-
-				if (jPropertyValue.Type == JTokenType.Float)
-				{
-					double value = jPropertyValue.Value<double>();
-					return value >= lowerBound.Value<double>() && value <= upperBound.Value<double>();
-				}
-
-				if (jPropertyValue.Type == JTokenType.Date)
-				{
-					DateTime value = jPropertyValue.Value<DateTime>();
-					return value >= lowerBound.Value<DateTime>() && value <= upperBound.Value<DateTime>();
-				}
-
-				if (jPropertyValue.Type == JTokenType.String)
-				{
-					string value = jPropertyValue.Value<string>();
-					string lowerStr = lowerBound.ToString();
-					string upperStr = upperBound.ToString();
-					return string.Compare(value, lowerStr) >= 0 && string.Compare(value, upperStr) <= 0;
-				}
-				else
-				{
-					// For other types, try converting to string and compare
-					string value = jPropertyValue.ToString();
-					string lowerStr = lowerBound.ToString();
-					string upperStr = upperBound.ToString();
-					return string.Compare(value, lowerStr) >= 0 && string.Compare(value, upperStr) <= 0;
-				}
-
-			default:
-				if (_logger != null)
-				{
-					_logger.LogWarning("Unsupported operator: {operator}", op);
-				}
-
-				return false;
-		}
-	}
-
-	private int CompareValues(JToken token, object value)
-	{
-		if (token == null || value == null)
-		{
-			return 0;
-		}
-
-		if (token.Type == JTokenType.Integer && value is int intValue)
-		{
-			return token.Value<int>().CompareTo(intValue);
-		}
-
-		if (token.Type == JTokenType.Float && value is double doubleValue)
-		{
-			return token.Value<double>().CompareTo(doubleValue);
-		}
-
-		if (token.Type == JTokenType.String && value is string stringValue)
-		{
-			return string.Compare(token.Value<string>(), stringValue, StringComparison.OrdinalIgnoreCase);
-		}
-		// Add more comparisons as needed
-
-		return 0;
 	}
 
 	private int CompareValues(object left, object right)
@@ -1124,24 +756,17 @@ public class CosmosDbQueryExecutor
 									lowerStr, propStr, upperStr);
 							}
 
-							return string.Compare(lowerStr, propStr, false) <= 0 &&
-							       string.Compare(propStr, upperStr, false) <= 0;
+							return string.Compare(lowerStr, propStr) <= 0 &&
+							       string.Compare(propStr, upperStr) <= 0;
 						}
 						else
 						{
 							// For other types, convert to string and compare
 							string propStr = jPropValue.ToString();
-							string lowerStr = lowerBound?.ToString() ?? string.Empty;
-							string upperStr = upperBound?.ToString() ?? string.Empty;
-
-							if (_logger != null)
-							{
-								_logger.LogDebug("String fallback BETWEEN comparison: {lower} <= {value} <= {upper}",
-									lowerStr, propStr, upperStr);
-							}
-
-							return string.Compare(lowerStr, propStr, false) <= 0 &&
-							       string.Compare(propStr, upperStr, false) <= 0;
+							string lowerStr = lowerBound.ToString();
+							string upperStr = upperBound.ToString();
+							return string.Compare(lowerStr, propStr) <= 0 &&
+							       string.Compare(propStr, upperStr) <= 0;
 						}
 					}
 					return false;
