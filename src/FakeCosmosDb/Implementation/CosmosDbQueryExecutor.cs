@@ -1496,7 +1496,7 @@ public class CosmosDbQueryExecutor
 
 		if (expression is FunctionCallExpression func)
 		{
-			return EvaluateFunction(item, func);
+			return EvaluateFunction(item, func, parameters);
 		}
 		else if (expression is UnaryExpression unary)
 		{
@@ -1605,7 +1605,7 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Evaluating function: {name}", func.Name);
 			}
 
-			return EvaluateFunction(item, func);
+			return EvaluateFunction(item, func, parameters);
 		}
 
 		if (expression is BinaryExpression binary)
@@ -1649,11 +1649,12 @@ public class CosmosDbQueryExecutor
 		throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
 	}
 
-	private bool EvaluateFunction(JObject item, FunctionCallExpression function)
+	private bool EvaluateFunction(JObject item, FunctionCallExpression function, IReadOnlyList<(string Name, object Value)> parameters = null)
 	{
 		if (_logger != null)
 		{
-			_logger.LogDebug("Evaluating function: {name} with {count} arguments", function.Name, function.Arguments.Count);
+			_logger.LogDebug("Evaluating function: {name} with {count} arguments", 
+				function.Name, function.Arguments.Count);
 		}
 
 		switch (function.Name.ToUpperInvariant())
@@ -1664,8 +1665,8 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("CONTAINS function requires 2 or 3 arguments");
 				}
 
-				var containsPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
-				var containsSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+				var containsPropertyValue = EvaluateValue(item, function.Arguments[0], parameters)?.ToString();
+				var containsSearchValue = EvaluateValue(item, function.Arguments[1], parameters)?.ToString();
 
 				// Third argument is an optional boolean for case insensitivity
 				// When set to true, CONTAINS performs a case-insensitive search
@@ -1673,7 +1674,7 @@ public class CosmosDbQueryExecutor
 				var ignoreCase = false;
 				if (function.Arguments.Count == 3)
 				{
-					var caseInsensitiveArg = EvaluateValue(item, function.Arguments[2]);
+					var caseInsensitiveArg = EvaluateValue(item, function.Arguments[2], parameters);
 					if (caseInsensitiveArg != null && bool.TryParse(caseInsensitiveArg.ToString(), out bool ignoreResult))
 					{
 						ignoreCase = ignoreResult;
@@ -1695,8 +1696,8 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("STARTSWITH function requires exactly 2 arguments");
 				}
 
-				var startsWithPropertyValue = EvaluateValue(item, function.Arguments[0])?.ToString();
-				var startsWithSearchValue = EvaluateValue(item, function.Arguments[1])?.ToString();
+				var startsWithPropertyValue = EvaluateValue(item, function.Arguments[0], parameters)?.ToString();
+				var startsWithSearchValue = EvaluateValue(item, function.Arguments[1], parameters)?.ToString();
 
 				if (startsWithPropertyValue == null || startsWithSearchValue == null)
 				{
@@ -1711,8 +1712,8 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("ARRAY_CONTAINS function requires exactly 2 arguments");
 				}
 
-				var arrayValue = EvaluateValue(item, function.Arguments[0]);
-				var searchValue = EvaluateValue(item, function.Arguments[1]);
+				var arrayValue = EvaluateValue(item, function.Arguments[0], parameters);
+				var searchValue = EvaluateValue(item, function.Arguments[1], parameters);
 
 				if (arrayValue == null || searchValue == null)
 				{
@@ -1799,15 +1800,17 @@ public class CosmosDbQueryExecutor
 					return isNull;
 				}
 
-				var value = EvaluateValue(item, function.Arguments[0]);
-				bool result = value == null;
+				var argValue = EvaluateValue(item, function.Arguments[0], parameters);
+				bool argIsNull = argValue == null || 
+				                 argValue == DBNull.Value || 
+				                 (argValue is JValue jv && jv.Type == JTokenType.Null);
 
 				if (_logger != null)
 				{
-					_logger.LogDebug("IS_NULL: Value is {result}", result ? "null" : "not null");
+					_logger.LogDebug("IS_NULL: Value is {result}", argIsNull ? "null" : "not null");
 				}
 
-				return result;
+				return argIsNull;
 
 			case "IS_DEFINED":
 				if (function.Arguments.Count != 1)
@@ -1815,23 +1818,32 @@ public class CosmosDbQueryExecutor
 					throw new ArgumentException("IS_DEFINED function requires exactly 1 argument");
 				}
 
-				if (function.Arguments[0] is PropertyExpression propDefined)
+				if (function.Arguments[0] is PropertyExpression isDefinedPropExpr)
 				{
-					var token = GetPropertyByPath(item, propDefined.PropertyPath);
+					var token = GetPropertyByPath(item, isDefinedPropExpr.PropertyPath);
 					bool isDefined = token != null;
 
 					if (_logger != null)
 					{
-						_logger.LogDebug("IS_DEFINED: Property '{path}' is {result}", propDefined.PropertyPath, isDefined ? "defined" : "not defined");
+						_logger.LogDebug("IS_DEFINED: Property '{path}' is {result}", 
+							isDefinedPropExpr.PropertyPath, isDefined ? "defined" : "not defined");
 					}
 
 					return isDefined;
 				}
 
-				throw new ArgumentException("IS_DEFINED function requires a property expression as its argument");
+				var isDefinedArgValue = EvaluateValue(item, function.Arguments[0], parameters);
+				bool isArgDefined = isDefinedArgValue != null && isDefinedArgValue != DBNull.Value;
+
+				if (_logger != null)
+				{
+					_logger.LogDebug("IS_DEFINED: Value is {result}", isArgDefined ? "defined" : "not defined");
+				}
+
+				return isArgDefined;
 
 			default:
-				throw new NotImplementedException($"Function {function.Name} not implemented");
+				throw new NotImplementedException($"Function {function.Name} is not implemented");
 		}
 	}
 }
