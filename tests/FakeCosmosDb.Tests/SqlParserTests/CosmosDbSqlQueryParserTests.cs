@@ -1,3 +1,4 @@
+using System.Linq;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.SqlParser;
@@ -20,8 +21,9 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
 	}
 
 	[Fact]
@@ -34,11 +36,12 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().HaveCount(3);
-		result.PropertyPaths.Should().Contain("c.id");
-		result.PropertyPaths.Should().Contain("c.name");
-		result.PropertyPaths.Should().Contain("c.address.city");
-		result.FromName.Should().Be("c");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.Items.Should().HaveCount(3);
+		result.SprachedSqlAst.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.id");
+		result.SprachedSqlAst.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.name");
+		result.SprachedSqlAst.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.address.city");
+		result.SprachedSqlAst.From.Source.Should().Be("c");
 	}
 
 	[Fact]
@@ -51,12 +54,22 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.WhereConditions.Should().HaveCount(1);
-		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.GreaterThan);
-		result.WhereConditions[0].Value.Value<int>().Should().Be(21);
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
+
+		var whereCondition = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		whereCondition.Should().NotBeNull();
+		whereCondition.Operator.Should().Be(BinaryOperator.GreaterThan);
+
+		var leftExpr = whereCondition.Left as PropertyExpression;
+		leftExpr.Should().NotBeNull();
+		leftExpr.PropertyPath.Should().Be("c.age");
+
+		var rightExpr = whereCondition.Right as ConstantExpression;
+		rightExpr.Should().NotBeNull();
+		rightExpr.Value.Should().Be(21);
 	}
 
 	[Fact]
@@ -69,17 +82,40 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.WhereConditions.Should().HaveCount(2);
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
 
-		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.GreaterThan);
-		result.WhereConditions[0].Value.Value<int>().Should().Be(21);
+		var andExpression = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		andExpression.Should().NotBeNull();
+		andExpression.Operator.Should().Be(BinaryOperator.And);
 
-		result.WhereConditions[1].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[1].Operator.Should().Be(ComparisonOperator.Equals);
-		result.WhereConditions[1].Value.Value<string>().Should().Be("John");
+		// Check first condition (c.age > 21)
+		var leftCondition = andExpression.Left as BinaryExpression;
+		leftCondition.Should().NotBeNull();
+		leftCondition.Operator.Should().Be(BinaryOperator.GreaterThan);
+
+		var leftProp = leftCondition.Left as PropertyExpression;
+		leftProp.Should().NotBeNull();
+		leftProp.PropertyPath.Should().Be("c.age");
+
+		var leftValue = leftCondition.Right as ConstantExpression;
+		leftValue.Should().NotBeNull();
+		leftValue.Value.Should().Be(21);
+
+		// Check second condition (c.name = 'John')
+		var rightCondition = andExpression.Right as BinaryExpression;
+		rightCondition.Should().NotBeNull();
+		rightCondition.Operator.Should().Be(BinaryOperator.Equal);
+
+		var rightProp = rightCondition.Left as PropertyExpression;
+		rightProp.Should().NotBeNull();
+		rightProp.PropertyPath.Should().Be("c.name");
+
+		var rightValue = rightCondition.Right as ConstantExpression;
+		rightValue.Should().NotBeNull();
+		rightValue.Value.Should().Be("John");
 	}
 
 	[Fact]
@@ -92,15 +128,17 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.OrderBy.Should().HaveCount(2);
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.OrderBy.Should().NotBeNull();
+		result.SprachedSqlAst.OrderBy.Items.Should().HaveCount(2);
 
-		result.OrderBy[0].PropertyPath.Should().Be("c.age");
-		result.OrderBy[0].Direction.Should().Be(SortDirection.Descending);
+		result.SprachedSqlAst.OrderBy.Items[0].PropertyPath.Should().Be("c.age");
+		result.SprachedSqlAst.OrderBy.Items[0].Descending.Should().BeTrue();
 
-		result.OrderBy[1].PropertyPath.Should().Be("c.name");
-		result.OrderBy[1].Direction.Should().Be(SortDirection.Ascending);
+		result.SprachedSqlAst.OrderBy.Items[1].PropertyPath.Should().Be("c.name");
+		result.SprachedSqlAst.OrderBy.Items[1].Descending.Should().BeFalse();
 	}
 
 	[Fact]
@@ -113,9 +151,11 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.Limit.Should().Be(10);
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Limit.Should().NotBeNull();
+		result.SprachedSqlAst.Limit.Value.Should().Be(10);
 	}
 
 	[Fact]
@@ -128,12 +168,23 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.WhereConditions.Should().HaveCount(1);
-		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
-		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
+
+		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		whereCondition.Should().NotBeNull();
+		whereCondition.FunctionName.Should().Be("CONTAINS");
+		whereCondition.Arguments.Should().HaveCount(2);
+
+		var propertyArg = whereCondition.Arguments[0] as PropertyExpression;
+		propertyArg.Should().NotBeNull();
+		propertyArg.PropertyPath.Should().Be("c.name");
+
+		var valueArg = whereCondition.Arguments[1] as ConstantExpression;
+		valueArg.Should().NotBeNull();
+		valueArg.Value.Should().Be("John");
 	}
 
 	[Fact]
@@ -146,13 +197,27 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.WhereConditions.Should().HaveCount(1);
-		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
-		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
-		result.WhereConditions[0].IgnoreCase.Should().BeFalse();
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
+
+		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		whereCondition.Should().NotBeNull();
+		whereCondition.FunctionName.Should().Be("CONTAINS");
+		whereCondition.Arguments.Should().HaveCount(3);
+
+		var propertyArg = whereCondition.Arguments[0] as PropertyExpression;
+		propertyArg.Should().NotBeNull();
+		propertyArg.PropertyPath.Should().Be("c.name");
+
+		var valueArg = whereCondition.Arguments[1] as ConstantExpression;
+		valueArg.Should().NotBeNull();
+		valueArg.Value.Should().Be("John");
+
+		var ignoreCase = whereCondition.Arguments[2] as ConstantExpression;
+		ignoreCase.Should().NotBeNull();
+		ignoreCase.Value.Should().Be(false);
 	}
 
 	[Fact]
@@ -165,13 +230,27 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.WhereConditions.Should().HaveCount(1);
-		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringContains);
-		result.WhereConditions[0].Value.Value<string>().Should().Be("John");
-		result.WhereConditions[0].IgnoreCase.Should().BeTrue();
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
+
+		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		whereCondition.Should().NotBeNull();
+		whereCondition.FunctionName.Should().Be("CONTAINS");
+		whereCondition.Arguments.Should().HaveCount(3);
+
+		var propertyArg = whereCondition.Arguments[0] as PropertyExpression;
+		propertyArg.Should().NotBeNull();
+		propertyArg.PropertyPath.Should().Be("c.name");
+
+		var valueArg = whereCondition.Arguments[1] as ConstantExpression;
+		valueArg.Should().NotBeNull();
+		valueArg.Value.Should().Be("John");
+
+		var ignoreCase = whereCondition.Arguments[2] as ConstantExpression;
+		ignoreCase.Should().NotBeNull();
+		ignoreCase.Value.Should().Be(true);
 	}
 
 	[Fact]
@@ -184,12 +263,23 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
-		result.WhereConditions.Should().HaveCount(1);
-		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.StringStartsWith);
-		result.WhereConditions[0].Value.Value<string>().Should().Be("J");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
+
+		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		whereCondition.Should().NotBeNull();
+		whereCondition.FunctionName.Should().Be("STARTSWITH");
+		whereCondition.Arguments.Should().HaveCount(2);
+
+		var propertyArg = whereCondition.Arguments[0] as PropertyExpression;
+		propertyArg.Should().NotBeNull();
+		propertyArg.PropertyPath.Should().Be("c.name");
+
+		var valueArg = whereCondition.Arguments[1] as ConstantExpression;
+		valueArg.Should().NotBeNull();
+		valueArg.Value.Should().Be("J");
 	}
 
 	[Fact]
@@ -202,21 +292,30 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
 
-		// BETWEEN is represented as a single condition with an array of bounds
-		result.WhereConditions.Should().HaveCount(1);
+		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		binaryExpr.Should().NotBeNull();
+		binaryExpr.Operator.Should().Be(BinaryOperator.Between);
 
-		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Between);
+		var propertyExpr = binaryExpr.Left as PropertyExpression;
+		propertyExpr.Should().NotBeNull();
+		propertyExpr.PropertyPath.Should().Be("c.age");
 
-		// The value should be an array with lower and upper bounds
-		result.WhereConditions[0].Value.Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Array);
-		result.WhereConditions[0].Value[0].Value<double>().Should().Be(18.8); // Lower bound
-		result.WhereConditions[0].Value[1].Value<double>().Should().Be(65.9); // Upper bound
+		var betweenExpr = binaryExpr.Right as BetweenExpression;
+		betweenExpr.Should().NotBeNull();
+
+		var lowerBound = betweenExpr.LowerBound as ConstantExpression;
+		lowerBound.Should().NotBeNull();
+		lowerBound.Value.Should().Be(18.8);
+
+		var upperBound = betweenExpr.UpperBound as ConstantExpression;
+		upperBound.Should().NotBeNull();
+		upperBound.Value.Should().Be(65.9);
 	}
-
 
 	[Fact]
 	public void ShouldParseBetweenIntOperator()
@@ -228,19 +327,29 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
 
-		// BETWEEN is represented as a single condition with an array of bounds
-		result.WhereConditions.Should().HaveCount(1);
+		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		binaryExpr.Should().NotBeNull();
+		binaryExpr.Operator.Should().Be(BinaryOperator.Between);
 
-		result.WhereConditions[0].PropertyPath.Should().Be("c.age");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Between);
+		var propertyExpr = binaryExpr.Left as PropertyExpression;
+		propertyExpr.Should().NotBeNull();
+		propertyExpr.PropertyPath.Should().Be("c.age");
 
-		// The value should be an array with lower and upper bounds
-		result.WhereConditions[0].Value.Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Array);
-		result.WhereConditions[0].Value[0].Value<int>().Should().Be(18); // Lower bound
-		result.WhereConditions[0].Value[1].Value<int>().Should().Be(65); // Upper bound
+		var betweenExpr = binaryExpr.Right as BetweenExpression;
+		betweenExpr.Should().NotBeNull();
+
+		var lowerBound = betweenExpr.LowerBound as ConstantExpression;
+		lowerBound.Should().NotBeNull();
+		lowerBound.Value.Should().Be(18);
+
+		var upperBound = betweenExpr.UpperBound as ConstantExpression;
+		upperBound.Should().NotBeNull();
+		upperBound.Value.Should().Be(65);
 	}
 
 	[Fact]
@@ -253,19 +362,29 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var result = _parser.Parse(sql);
 
 		// Assert
-		result.PropertyPaths.Should().ContainSingle("*");
-		result.FromName.Should().Be("c");
+		result.SprachedSqlAst.Should().NotBeNull();
+		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
+		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.SprachedSqlAst.Where.Should().NotBeNull();
 
-		// BETWEEN is represented as a single condition with an array of bounds
-		result.WhereConditions.Should().HaveCount(1);
+		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		binaryExpr.Should().NotBeNull();
+		binaryExpr.Operator.Should().Be(BinaryOperator.Between);
 
-		result.WhereConditions[0].PropertyPath.Should().Be("c.name");
-		result.WhereConditions[0].Operator.Should().Be(ComparisonOperator.Between);
+		var propertyExpr = binaryExpr.Left as PropertyExpression;
+		propertyExpr.Should().NotBeNull();
+		propertyExpr.PropertyPath.Should().Be("c.name");
 
-		// The value should be an array with lower and upper bounds
-		result.WhereConditions[0].Value.Type.Should().Be(Newtonsoft.Json.Linq.JTokenType.Array);
-		result.WhereConditions[0].Value[0].Value<string>().Should().Be("A"); // Lower bound
-		result.WhereConditions[0].Value[1].Value<string>().Should().Be("M"); // Upper bound
+		var betweenExpr = binaryExpr.Right as BetweenExpression;
+		betweenExpr.Should().NotBeNull();
+
+		var lowerBound = betweenExpr.LowerBound as ConstantExpression;
+		lowerBound.Should().NotBeNull();
+		lowerBound.Value.Should().Be("A");
+
+		var upperBound = betweenExpr.UpperBound as ConstantExpression;
+		upperBound.Should().NotBeNull();
+		upperBound.Value.Should().Be("M");
 	}
 
 	[Fact]
