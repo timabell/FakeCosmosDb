@@ -1,63 +1,30 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
 namespace TimAbell.FakeCosmosDb.SqlParser;
 
-public class CosmosDbSqlQueryParser(ILogger logger)
+public class CosmosDbSqlQueryParser()
 {
 	/// <summary>
 	/// Parses a CosmosDB SQL query using the Sprache grammar.
 	/// </summary>
 	public ParsedQuery Parse(string query)
 	{
-		logger?.LogDebug($"SpracheSqlQueryParser: Parsing query '{query}'");
+		// First try to parse with the grammar
+		var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
 
-		try
+		var result = ConvertToLegacyParsedQuery(parsedQuery);
+
+		// If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
+		if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
+		    (query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
 		{
-			// First try to parse with the grammar
-			var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
-			logger?.LogDebug($"SpracheSqlQueryParser: Successfully parsed AST: {parsedQuery}");
-
-			var result = ConvertToLegacyParsedQuery(parsedQuery);
-
-			// Log the extracted WHERE conditions for debugging
-			if (result.WhereConditions != null)
-			{
-				logger?.LogDebug($"SpracheSqlQueryParser: Extracted {result.WhereConditions.Count} WHERE conditions:");
-				foreach (var condition in result.WhereConditions)
-				{
-					logger?.LogDebug($"  - {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
-				}
-			}
-			else
-			{
-				logger?.LogDebug("SpracheSqlQueryParser: No WHERE conditions extracted");
-			}
-
-			// Log the legacy parsed query properties
-			logger?.LogDebug($"SpracheSqlQueryParser: Legacy ParsedQuery: FromName={result.FromName}, FromAlias={result.FromAlias}");
-			logger?.LogDebug($"SpracheSqlQueryParser: PropertyPaths={string.Join(", ", result.PropertyPaths)}");
-			logger?.LogDebug($"SpracheSqlQueryParser: Limit={result.Limit}");
-			logger?.LogDebug($"SpracheSqlQueryParser: TopValue={result.TopValue}");
-
-			// If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
-			if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
-				(query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
-			{
-				logger?.LogDebug("SpracheSqlQueryParser: Using fallback parser for ORDER BY and LIMIT");
-				FallbackParseOrderByAndLimit(query, result);
-			}
-
-			return result;
+			FallbackParseOrderByAndLimit(query, result);
 		}
-		catch (Exception ex)
-		{
-			logger?.LogError(ex, $"SpracheSqlQueryParser: Error parsing query: {ex.Message}");
-			throw new FormatException($"Failed to parse CosmosDB SQL query: {ex.Message}", ex);
-		}
+
+		return result;
 	}
 
 	/// <summary>
@@ -144,6 +111,7 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 			{
 				result.WhereConditions = whereConditions;
 			}
+
 			result.WhereExpression = query.Where.Condition;
 		}
 
@@ -232,6 +200,7 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 			conditions.AddRange(ExtractWhereConditions(orExpr.Left));
 			// Ignore the right side in an OR condition
 		}
+
 		// If it's a comparison (e.g., Property > Value)
 		if (condition is BinaryExpression comparison)
 		{
@@ -242,7 +211,7 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 				{
 					// For BETWEEN operator with two constant values
 					if (betweenExpr.LowerBound is ConstantExpression lowerConstExpr &&
-						betweenExpr.UpperBound is ConstantExpression upperConstExpr)
+					    betweenExpr.UpperBound is ConstantExpression upperConstExpr)
 					{
 						// Create a single BETWEEN condition
 						conditions.Add(new WhereCondition
@@ -303,13 +272,11 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 			string functionName = functionCall.FunctionName.ToUpperInvariant();
 
 			if ((functionName == "CONTAINS" || functionName == "STARTSWITH") &&
-				functionCall.Arguments.Count >= 2 &&
-				functionCall.Arguments[0] is PropertyExpression propExpr &&
-				functionCall.Arguments[1] is ConstantExpression constExpr)
+			    functionCall.Arguments.Count >= 2 &&
+			    functionCall.Arguments[0] is PropertyExpression propExpr &&
+			    functionCall.Arguments[1] is ConstantExpression constExpr)
 			{
-				var op = functionName == "CONTAINS" ?
-					ComparisonOperator.StringContains :
-					ComparisonOperator.StringStartsWith;
+				var op = functionName == "CONTAINS" ? ComparisonOperator.StringContains : ComparisonOperator.StringStartsWith;
 
 				var whereCondition = new WhereCondition
 				{
@@ -320,8 +287,8 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 
 				// For CONTAINS with 3 arguments, the third is a boolean for case-insensitivity
 				if (functionName == "CONTAINS" && functionCall.Arguments.Count == 3 &&
-					functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
-					caseInsensitiveArg.Value is bool ignoreCase)
+				    functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
+				    caseInsensitiveArg.Value is bool ignoreCase)
 				{
 					whereCondition.IgnoreCase = ignoreCase;
 				}
@@ -329,8 +296,8 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 				conditions.Add(whereCondition);
 			}
 			else if (functionName == "IS_NULL" &&
-					functionCall.Arguments.Count == 1 &&
-					functionCall.Arguments[0] is PropertyExpression propNullExpr)
+			         functionCall.Arguments.Count == 1 &&
+			         functionCall.Arguments[0] is PropertyExpression propNullExpr)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -340,8 +307,8 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 				});
 			}
 			else if (functionName == "IS_DEFINED" &&
-					functionCall.Arguments.Count == 1 &&
-					functionCall.Arguments[0] is PropertyExpression propDefinedExpr)
+			         functionCall.Arguments.Count == 1 &&
+			         functionCall.Arguments[0] is PropertyExpression propDefinedExpr)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -352,9 +319,9 @@ public class CosmosDbSqlQueryParser(ILogger logger)
 				});
 			}
 			else if (functionName == "ARRAY_CONTAINS" &&
-					functionCall.Arguments.Count == 2 &&
-					functionCall.Arguments[0] is PropertyExpression propArrayExpr &&
-					functionCall.Arguments[1] is ConstantExpression constArrayExpr)
+			         functionCall.Arguments.Count == 2 &&
+			         functionCall.Arguments[0] is PropertyExpression propArrayExpr &&
+			         functionCall.Arguments[1] is ConstantExpression constArrayExpr)
 			{
 				conditions.Add(new WhereCondition
 				{

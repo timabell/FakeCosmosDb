@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.SqlParser;
-using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -9,7 +8,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlParserTests;
 
 public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 {
-	private readonly CosmosDbSqlQueryParser _parser = new(new TestLogger(output));
+	private readonly CosmosDbSqlQueryParser _parser = new();
 
 	[Fact]
 	public void ShouldParseSimpleSelectQuery()
@@ -306,7 +305,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	public void ShouldHandleQuotedStringsInWhereConditions()
 	{
 		// Arrange
-		var parser = new CosmosDbSqlQueryParser(new TestLogger(output));
+		var parser = new CosmosDbSqlQueryParser();
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act
@@ -326,7 +325,7 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	public void ShouldHandleIntegrationTestQuery()
 	{
 		// This exact query is used in the integration test
-		var parser = new CosmosDbSqlQueryParser(new TestLogger(output));
+		var parser = new CosmosDbSqlQueryParser();
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act

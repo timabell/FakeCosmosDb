@@ -26,7 +26,7 @@ public class FakeContainer : Container
 
 	public FakeContainer(ILogger logger = null)
 	{
-		_queryParser = new CosmosDbSqlQueryParser(logger);
+		_queryParser = new CosmosDbSqlQueryParser();
 		_queryExecutor = new CosmosDbQueryExecutor(logger);
 		_logger = logger;
 	}
