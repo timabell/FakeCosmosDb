@@ -17,13 +17,6 @@ public class CosmosDbSqlQueryParser()
 
 		var result = ConvertToLegacyParsedQuery(parsedQuery);
 
-		// If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
-		if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
-			(query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
-		{
-			FallbackParseOrderByAndLimit(query, result);
-		}
-
 		return result;
 	}
 
@@ -376,85 +369,5 @@ public class CosmosDbSqlQueryParser()
 			BinaryOperator.Between => ComparisonOperator.Between,
 			_ => throw new NotSupportedException($"Operator '{op}' is not supported in WHERE conditions")
 		};
-	}
-
-	/// <summary>
-	/// Fallback method to parse ORDER BY and LIMIT clauses directly from the SQL string
-	/// when the grammar parser fails to handle them.
-	/// </summary>
-	private void FallbackParseOrderByAndLimit(string query, ParsedQuery result) // todo: move to AST
-	{
-		// Handle ORDER BY
-		if (query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null)
-		{
-			var orderByIndex = query.IndexOf("ORDER BY", StringComparison.OrdinalIgnoreCase);
-			var orderByClause = query.Substring(orderByIndex);
-
-			// If there's a LIMIT after ORDER BY, trim it
-			if (orderByClause.Contains("LIMIT", StringComparison.OrdinalIgnoreCase))
-			{
-				orderByClause = orderByClause.Substring(0, orderByClause.IndexOf("LIMIT", StringComparison.OrdinalIgnoreCase));
-			}
-
-			// Remove "ORDER BY" prefix
-			orderByClause = orderByClause.Substring("ORDER BY".Length).Trim();
-
-			// Parse each ORDER BY item
-			var orderByItems = new List<OrderInfo>();
-			foreach (var item in orderByClause.Split(','))
-			{
-				var trimmedItem = item.Trim();
-				var direction = SortDirection.Ascending;
-				var propertyPath = trimmedItem;
-
-				// Check for DESC/ASC
-				if (trimmedItem.EndsWith(" DESC", StringComparison.OrdinalIgnoreCase))
-				{
-					direction = SortDirection.Descending;
-					propertyPath = trimmedItem.Substring(0, trimmedItem.Length - " DESC".Length).Trim();
-				}
-				else if (trimmedItem.EndsWith(" ASC", StringComparison.OrdinalIgnoreCase))
-				{
-					propertyPath = trimmedItem.Substring(0, trimmedItem.Length - " ASC".Length).Trim();
-				}
-
-				orderByItems.Add(new OrderInfo
-				{
-					PropertyPath = propertyPath,
-					Direction = direction
-				});
-			}
-
-			if (orderByItems.Count > 0)
-			{
-				result.OrderBy = orderByItems;
-			}
-		}
-
-		// Handle LIMIT
-		if (query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0)
-		{
-			var limitIndex = query.IndexOf("LIMIT", StringComparison.OrdinalIgnoreCase);
-			var limitClause = query.Substring(limitIndex + "LIMIT".Length).Trim();
-
-			// Extract the limit number
-			var limitValue = 0;
-			foreach (var c in limitClause)
-			{
-				if (char.IsDigit(c))
-				{
-					limitValue = limitValue * 10 + (c - '0');
-				}
-				else
-				{
-					break;
-				}
-			}
-
-			if (limitValue > 0)
-			{
-				result.Limit = limitValue;
-			}
-		}
 	}
 }
