@@ -1147,7 +1147,7 @@ public class CosmosDbQueryExecutor
 					return false;
 
 				default:
-					throw new NotImplementedException($"Operator {binary.Operator} not implemented");
+					throw new NotSupportedException($"Operator {binary.Operator} not implemented");
 			}
 		}
 
@@ -1238,11 +1238,11 @@ public class CosmosDbQueryExecutor
 					throw new InvalidOperationException($"NOT operator can only be applied to boolean values, but got {operandValue?.GetType().Name ?? "null"}");
 
 				default:
-					throw new NotImplementedException($"Unary operator {unary.Operator} not implemented");
+					throw new NotSupportedException($"Unary operator {unary.Operator} not implemented");
 			}
 		}
 
-		throw new NotImplementedException($"Expression type {expression.GetType().Name} not implemented");
+		throw new NotSupportedException($"Expression type {expression.GetType().Name} not implemented");
 	}
 
 	private object EvaluateValue(JObject item, Expression expression, IReadOnlyList<(string Name, object Value)> parameters = null)
@@ -1358,7 +1358,7 @@ public class CosmosDbQueryExecutor
 			return new JArray(lowerBound, upperBound);
 		}
 
-		throw new NotImplementedException($"Value expression type {expression.GetType().Name} not implemented");
+		throw new NotSupportedException($"Value expression type {expression.GetType().Name} not implemented");
 	}
 
 	private bool EvaluateFunction(JObject item, FunctionCallExpression function, IReadOnlyList<(string Name, object Value)> parameters = null)
@@ -1555,7 +1555,7 @@ public class CosmosDbQueryExecutor
 				return isArgDefined;
 
 			default:
-				throw new NotImplementedException($"Function {function.Name} is not implemented");
+				throw new NotSupportedException($"Function {function.Name} is not implemented");
 		}
 	}
 }
