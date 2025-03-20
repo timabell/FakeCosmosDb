@@ -1,12 +1,10 @@
 // Adapter for real CosmosDB
 
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 namespace TimAbell.FakeCosmosDb;
 

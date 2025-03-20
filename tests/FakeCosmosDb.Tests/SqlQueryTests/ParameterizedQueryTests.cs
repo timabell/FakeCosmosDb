@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;

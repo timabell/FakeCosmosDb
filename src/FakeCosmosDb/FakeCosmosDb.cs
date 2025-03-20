@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using TimAbell.FakeCosmosDb.Implementation;
-using TimAbell.FakeCosmosDb.SqlParser;
 
 namespace TimAbell.FakeCosmosDb;
 
