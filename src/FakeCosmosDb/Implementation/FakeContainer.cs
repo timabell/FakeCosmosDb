@@ -9,6 +9,7 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Scripts;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
+using TimAbell.FakeCosmosDb.QueryExecutor;
 using TimAbell.FakeCosmosDb.SqlParser;
 
 namespace TimAbell.FakeCosmosDb.Implementation;

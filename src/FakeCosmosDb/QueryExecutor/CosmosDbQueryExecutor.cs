@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.SqlParser;
 
-namespace TimAbell.FakeCosmosDb.Implementation;
+namespace TimAbell.FakeCosmosDb.QueryExecutor;
 
 public class CosmosDbQueryExecutor
 {
@@ -148,7 +148,7 @@ public class CosmosDbQueryExecutor
 		}
 
 		// Handle numeric comparisons
-		if (IsNumeric(left) && IsNumeric(right))
+		if (Helpers.IsNumeric(left) && Helpers.IsNumeric(right))
 		{
 			// Convert both to double for numeric comparison
 			double leftDouble = Convert.ToDouble(left);
@@ -170,13 +170,6 @@ public class CosmosDbQueryExecutor
 
 		// Default to string comparison
 		return left.ToString().CompareTo(right.ToString());
-	}
-
-	private static bool IsNumeric(object value)
-	{
-		return value is sbyte || value is byte || value is short || value is ushort ||
-			   value is int || value is uint || value is long || value is ulong ||
-			   value is float || value is double || value is decimal;
 	}
 
 	private IEnumerable<string> GetSelectedProperties(SelectClause selectClause)
@@ -307,6 +300,7 @@ public class CosmosDbQueryExecutor
 					{
 						_logger.LogDebug("Property '{name}' not found in object", currentPart);
 					}
+
 					return null;
 				}
 			}
@@ -399,6 +393,7 @@ public class CosmosDbQueryExecutor
 						value?.ToString() ?? "null", value?.GetType().Name ?? "null");
 				}
 			}
+
 			if (value is bool boolValue)
 			{
 				return boolValue;
@@ -427,6 +422,7 @@ public class CosmosDbQueryExecutor
 					{
 						return boolValue;
 					}
+
 					return paramMatch.Value != null;
 				}
 			}
@@ -466,6 +462,7 @@ public class CosmosDbQueryExecutor
 							_logger.LogDebug("NOT operator on boolean value {value} returned {result}", boolVal, result);
 							_logger.LogDebug("NOT operator: operand value {value} is of type {type}", operandValue, operandValue?.GetType().Name);
 						}
+
 						return result;
 					}
 
@@ -509,6 +506,7 @@ public class CosmosDbQueryExecutor
 						propValue?.ToString() ?? "null", propValue?.GetType().Name ?? "null");
 				}
 			}
+
 			if (_logger != null)
 			{
 				_logger.LogDebug("Property '{path}' value: '{value}' (Type: {type})",
@@ -531,6 +529,7 @@ public class CosmosDbQueryExecutor
 						_logger.LogDebug("Found parameter value for {paramName} in value context: {value}",
 							param.ParameterName, paramMatch.Value?.ToString() ?? "null");
 					}
+
 					return paramMatch.Value;
 				}
 			}
@@ -563,6 +562,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Binary expression evaluated to: {result}", result);
 			}
+
 			return result;
 		}
 
@@ -574,6 +574,7 @@ public class CosmosDbQueryExecutor
 			{
 				_logger.LogDebug("Unary expression evaluated to: {result}", result);
 			}
+
 			return result;
 		}
 
@@ -687,6 +688,7 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("ARRAY_CONTAINS: Found match for {value} in array", searchValue);
 							}
+
 							return true;
 						}
 					}
@@ -695,6 +697,7 @@ public class CosmosDbQueryExecutor
 					{
 						_logger.LogDebug("ARRAY_CONTAINS: No match found for {value} in array", searchValue);
 					}
+
 					return false;
 				}
 
@@ -709,6 +712,7 @@ public class CosmosDbQueryExecutor
 							{
 								_logger.LogDebug("ARRAY_CONTAINS: Found match for {value} in array", searchValue);
 							}
+
 							return true;
 						}
 					}
@@ -717,6 +721,7 @@ public class CosmosDbQueryExecutor
 					{
 						_logger.LogDebug("ARRAY_CONTAINS: No match found for {value} in array", searchValue);
 					}
+
 					return false;
 				}
 
@@ -726,6 +731,7 @@ public class CosmosDbQueryExecutor
 					_logger.LogDebug("ARRAY_CONTAINS: Value is not an array: {value} (Type: {type})",
 						arrayValue, arrayValue.GetType().Name);
 				}
+
 				return false;
 
 			case "IS_NULL":
@@ -791,401 +797,6 @@ public class CosmosDbQueryExecutor
 
 			default:
 				throw new NotSupportedException($"Function {function.Name} is not implemented");
-		}
-	}
-
-	/// <summary>
-	/// Interface for the binary operator evaluation strategy pattern
-	/// </summary>
-	private interface IBinaryOperatorEvaluator
-	{
-		/// <summary>
-		/// Evaluates the binary operator with the given operands
-		/// </summary>
-		/// <param name="left">Left operand</param>
-		/// <param name="right">Right operand</param>
-		/// <returns>Result of the binary operation</returns>
-		bool Evaluate(object left, object right);
-	}
-
-	/// <summary>
-	/// Evaluates equality between two values
-	/// </summary>
-	private class EqualityEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly ILogger _logger;
-
-		public EqualityEvaluator(ILogger logger)
-		{
-			_logger = logger;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			// Handle string comparison
-			string leftStr = ExtractStringValue(left);
-			string rightStr = ExtractStringValue(right);
-
-			if (left is JValue leftJValue && leftJValue.Type == JTokenType.String &&
-				(right is JValue rightJValue && rightJValue.Type == JTokenType.String || right is string))
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("String equality comparison: '{left}' = '{right}'", leftStr, rightStr);
-				}
-				return string.Equals(leftStr, rightStr, StringComparison.Ordinal);
-			}
-
-			// Handle numeric comparisons
-			double? leftNum = ExtractNumericValue(left);
-			double? rightNum = ExtractNumericValue(right);
-
-			if (leftNum.HasValue && rightNum.HasValue)
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("Numeric equality comparison: {left} = {right}", leftNum.Value, rightNum.Value);
-				}
-				return Math.Abs(leftNum.Value - rightNum.Value) < 0.000001; // Use small epsilon for floating point comparison
-			}
-
-			// Handle boolean comparisons
-			bool? leftBool = ExtractBooleanValue(left);
-			bool? rightBool = ExtractBooleanValue(right);
-
-			if (leftBool.HasValue && rightBool.HasValue)
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("Boolean equality comparison: {left} = {right}", leftBool.Value, rightBool.Value);
-				}
-				return leftBool.Value == rightBool.Value;
-			}
-
-			// Default object equality
-			return Equals(left, right);
-		}
-	}
-
-	/// <summary>
-	/// Evaluates inequality between two values
-	/// </summary>
-	private class InequalityEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly EqualityEvaluator _equalityEvaluator;
-
-		public InequalityEvaluator(ILogger logger)
-		{
-			_equalityEvaluator = new EqualityEvaluator(logger);
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			return !_equalityEvaluator.Evaluate(left, right);
-		}
-	}
-
-	/// <summary>
-	/// Evaluates greater than comparison between two values
-	/// </summary>
-	private class GreaterThanEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly ILogger _logger;
-		private readonly Func<object, object, int> _comparer;
-
-		public GreaterThanEvaluator(ILogger logger, Func<object, object, int> comparer)
-		{
-			_logger = logger;
-			_comparer = comparer;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			double? leftNum = ExtractNumericValue(left);
-			double? rightNum = ExtractNumericValue(right);
-
-			if (leftNum.HasValue && rightNum.HasValue)
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("Numeric GT comparison: {left} > {right}", leftNum.Value, rightNum.Value);
-				}
-				return leftNum.Value > rightNum.Value;
-			}
-
-			return _comparer(left, right) > 0;
-		}
-	}
-
-	/// <summary>
-	/// Evaluates less than comparison between two values
-	/// </summary>
-	private class LessThanEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly ILogger _logger;
-		private readonly Func<object, object, int> _comparer;
-
-		public LessThanEvaluator(ILogger logger, Func<object, object, int> comparer)
-		{
-			_logger = logger;
-			_comparer = comparer;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			double? leftNum = ExtractNumericValue(left);
-			double? rightNum = ExtractNumericValue(right);
-
-			if (leftNum.HasValue && rightNum.HasValue)
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("Numeric LT comparison: {left} < {right}", leftNum.Value, rightNum.Value);
-				}
-				return leftNum.Value < rightNum.Value;
-			}
-
-			return _comparer(left, right) < 0;
-		}
-	}
-
-	/// <summary>
-	/// Evaluates greater than or equal comparison between two values
-	/// </summary>
-	private class GreaterThanOrEqualEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly ILogger _logger;
-		private readonly Func<object, object, int> _comparer;
-
-		public GreaterThanOrEqualEvaluator(ILogger logger, Func<object, object, int> comparer)
-		{
-			_logger = logger;
-			_comparer = comparer;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			double? leftNum = ExtractNumericValue(left);
-			double? rightNum = ExtractNumericValue(right);
-
-			if (leftNum.HasValue && rightNum.HasValue)
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("Numeric GTE comparison: {left} >= {right}", leftNum.Value, rightNum.Value);
-				}
-				return leftNum.Value >= rightNum.Value;
-			}
-
-			return _comparer(left, right) >= 0;
-		}
-	}
-
-	/// <summary>
-	/// Evaluates less than or equal comparison between two values
-	/// </summary>
-	private class LessThanOrEqualEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly ILogger _logger;
-		private readonly Func<object, object, int> _comparer;
-
-		public LessThanOrEqualEvaluator(ILogger logger, Func<object, object, int> comparer)
-		{
-			_logger = logger;
-			_comparer = comparer;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			double? leftNum = ExtractNumericValue(left);
-			double? rightNum = ExtractNumericValue(right);
-
-			if (leftNum.HasValue && rightNum.HasValue)
-			{
-				if (_logger != null)
-				{
-					_logger.LogDebug("Numeric LTE comparison: {left} <= {right}", leftNum.Value, rightNum.Value);
-				}
-				return leftNum.Value <= rightNum.Value;
-			}
-
-			return _comparer(left, right) <= 0;
-		}
-	}
-
-	/// <summary>
-	/// Evaluates logical AND between two expressions
-	/// </summary>
-	private class LogicalAndEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly JObject _item;
-		private readonly Expression _left;
-		private readonly Expression _right;
-		private readonly IReadOnlyList<(string Name, object Value)> _parameters;
-		private readonly Func<JObject, Expression, IReadOnlyList<(string Name, object Value)>, bool> _expressionEvaluator;
-
-		public LogicalAndEvaluator(
-			JObject item,
-			Expression left,
-			Expression right,
-			IReadOnlyList<(string Name, object Value)> parameters,
-			Func<JObject, Expression, IReadOnlyList<(string Name, object Value)>, bool> expressionEvaluator)
-		{
-			_item = item;
-			_left = left;
-			_right = right;
-			_parameters = parameters;
-			_expressionEvaluator = expressionEvaluator;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			// This is not used since we need to short-circuit evaluation
-			return _expressionEvaluator(_item, _left, _parameters) && _expressionEvaluator(_item, _right, _parameters);
-		}
-	}
-
-	/// <summary>
-	/// Evaluates logical OR between two expressions
-	/// </summary>
-	private class LogicalOrEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly JObject _item;
-		private readonly Expression _left;
-		private readonly Expression _right;
-		private readonly IReadOnlyList<(string Name, object Value)> _parameters;
-		private readonly Func<JObject, Expression, IReadOnlyList<(string Name, object Value)>, bool> _expressionEvaluator;
-
-		public LogicalOrEvaluator(
-			JObject item,
-			Expression left,
-			Expression right,
-			IReadOnlyList<(string Name, object Value)> parameters,
-			Func<JObject, Expression, IReadOnlyList<(string Name, object Value)>, bool> expressionEvaluator)
-		{
-			_item = item;
-			_left = left;
-			_right = right;
-			_parameters = parameters;
-			_expressionEvaluator = expressionEvaluator;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			// This is not used since we need to short-circuit evaluation
-			return _expressionEvaluator(_item, _left, _parameters) || _expressionEvaluator(_item, _right, _parameters);
-		}
-	}
-
-	/// <summary>
-	/// Evaluates BETWEEN condition for a property value between two bounds
-	/// </summary>
-	private class BetweenEvaluator : IBinaryOperatorEvaluator
-	{
-		private readonly JObject _item;
-		private readonly Expression _left;
-		private readonly Expression _right;
-		private readonly IReadOnlyList<(string Name, object Value)> _parameters;
-		private readonly ILogger _logger;
-		private readonly Func<JObject, string, object> _propertyGetter;
-		private readonly Func<JObject, Expression, IReadOnlyList<(string Name, object Value)>, object> _valueEvaluator;
-
-		public BetweenEvaluator(
-			JObject item,
-			Expression left,
-			Expression right,
-			IReadOnlyList<(string Name, object Value)> parameters,
-			ILogger logger,
-			Func<JObject, string, object> propertyGetter,
-			Func<JObject, Expression, IReadOnlyList<(string Name, object Value)>, object> valueEvaluator)
-		{
-			_item = item;
-			_left = left;
-			_right = right;
-			_parameters = parameters;
-			_logger = logger;
-			_propertyGetter = propertyGetter;
-			_valueEvaluator = valueEvaluator;
-		}
-
-		public bool Evaluate(object left, object right)
-		{
-			// This method implementation doesn't use the parameters since we need to evaluate expressions differently
-			if (_left is PropertyExpression propExpression && _right is BetweenExpression betweenExpr)
-			{
-				// Get the property value
-				var propValue = _propertyGetter(_item, propExpression.PropertyPath);
-
-				// Convert to JToken if needed
-				JToken jPropValue = propValue as JToken ?? JToken.FromObject(propValue);
-
-				// Get the lower and upper bounds
-				var lowerBound = _valueEvaluator(_item, betweenExpr.LowerBound, _parameters);
-				var upperBound = _valueEvaluator(_item, betweenExpr.UpperBound, _parameters);
-
-				if (_logger != null)
-				{
-					_logger.LogDebug("Evaluating BETWEEN: {prop} BETWEEN {lower} AND {upper}",
-						jPropValue, lowerBound, upperBound);
-				}
-
-				// Extract numeric values for comparison
-				if (jPropValue.Type == JTokenType.Integer || jPropValue.Type == JTokenType.Float)
-				{
-					double propNum = jPropValue.Value<double>();
-					double lowerNum = lowerBound is JToken jLower ? jLower.Value<double>() : Convert.ToDouble(lowerBound);
-					double upperNum = upperBound is JToken jUpper ? jUpper.Value<double>() : Convert.ToDouble(upperBound);
-
-					if (_logger != null)
-					{
-						_logger.LogDebug("Numeric BETWEEN comparison: {lower} <= {value} <= {upper}",
-							lowerNum, propNum, upperNum);
-					}
-
-					return lowerNum <= propNum && propNum <= upperNum;
-				}
-
-				if (jPropValue.Type == JTokenType.Date)
-				{
-					DateTime propDate = jPropValue.Value<DateTime>();
-					DateTime lowerDate = lowerBound is JToken jLower ? jLower.Value<DateTime>() : Convert.ToDateTime(lowerBound);
-					DateTime upperDate = upperBound is JToken jUpper ? jUpper.Value<DateTime>() : Convert.ToDateTime(upperBound);
-
-					if (_logger != null)
-					{
-						_logger.LogDebug("DateTime BETWEEN comparison: {lower} <= {value} <= {upper}",
-							lowerDate, propDate, upperDate);
-					}
-
-					return lowerDate <= propDate && propDate <= upperDate;
-				}
-
-				if (jPropValue.Type == JTokenType.String)
-				{
-					string propStr = jPropValue.Value<string>();
-					string lowerStr = lowerBound is JToken jLower ? jLower.Value<string>() : Convert.ToString(lowerBound);
-					string upperStr = upperBound is JToken jUpper ? jUpper.Value<string>() : Convert.ToString(upperBound);
-
-					if (_logger != null)
-					{
-						_logger.LogDebug("String BETWEEN comparison: {lower} <= {value} <= {upper}",
-							lowerStr, propStr, upperStr);
-					}
-
-					return string.Compare(lowerStr, propStr) <= 0 &&
-							string.Compare(propStr, upperStr) <= 0;
-				}
-				else
-				{
-					// For other types, convert to string and compare
-					string propStr = jPropValue.ToString();
-					string lowerStr = lowerBound.ToString();
-					string upperStr = upperBound.ToString();
-					return string.Compare(lowerStr, propStr) <= 0 &&
-							string.Compare(propStr, upperStr) <= 0;
-				}
-			}
-			return false;
 		}
 	}
 
@@ -1263,93 +874,8 @@ public class CosmosDbQueryExecutor
 				_logger.LogDebug("Could not convert {value} to {type}: {error}",
 					value, typeof(T).Name, ex.Message);
 			}
+
 			return default;
 		}
-	}
-
-	/// <summary>
-	/// Extracts a numeric value from an object, handling different numeric representations.
-	/// </summary>
-	/// <param name="value">The value to extract from</param>
-	/// <returns>The numeric value as a double, or null if not numeric</returns>
-	private static double? ExtractNumericValue(object value)
-	{
-		if (value == null)
-		{
-			return null;
-		}
-
-		if (value is JValue jValue)
-		{
-			if (jValue.Type == JTokenType.Integer || jValue.Type == JTokenType.Float)
-			{
-				return jValue.Value<double>();
-			}
-			value = jValue.Value;
-		}
-
-		if (IsNumeric(value))
-		{
-			return Convert.ToDouble(value);
-		}
-
-		double parsedNum;
-		if (double.TryParse(value?.ToString(), out parsedNum))
-		{
-			return parsedNum;
-		}
-
-		return null;
-	}
-
-	/// <summary>
-	/// Extracts a string value from an object, handling JValue string type.
-	/// </summary>
-	/// <param name="value">The value to extract from</param>
-	/// <returns>The string value, or null if the input is null</returns>
-	private static string ExtractStringValue(object value)
-	{
-		if (value == null)
-		{
-			return null;
-		}
-
-		if (value is JValue jValue && jValue.Type == JTokenType.String)
-		{
-			return jValue.Value<string>();
-		}
-
-		return value.ToString();
-	}
-
-	/// <summary>
-	/// Extracts a boolean value from an object, handling various boolean representations.
-	/// </summary>
-	/// <param name="value">The value to extract from</param>
-	/// <returns>The boolean value, or null if conversion fails</returns>
-	private static bool? ExtractBooleanValue(object value)
-	{
-		if (value == null)
-		{
-			return null;
-		}
-
-		if (value is bool boolValue)
-		{
-			return boolValue;
-		}
-
-		if (value is JValue jValue && jValue.Type == JTokenType.Boolean)
-		{
-			return jValue.Value<bool>();
-		}
-
-		bool result;
-		if (bool.TryParse(value.ToString(), out result))
-		{
-			return result;
-		}
-
-		return null;
 	}
 }
