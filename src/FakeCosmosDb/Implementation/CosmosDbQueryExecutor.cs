@@ -757,7 +757,7 @@ public class CosmosDbQueryExecutor
 							}
 
 							return string.Compare(lowerStr, propStr) <= 0 &&
-							       string.Compare(propStr, upperStr) <= 0;
+								   string.Compare(propStr, upperStr) <= 0;
 						}
 						else
 						{
@@ -766,7 +766,7 @@ public class CosmosDbQueryExecutor
 							string lowerStr = lowerBound.ToString();
 							string upperStr = upperBound.ToString();
 							return string.Compare(lowerStr, propStr) <= 0 &&
-							       string.Compare(propStr, upperStr) <= 0;
+								   string.Compare(propStr, upperStr) <= 0;
 						}
 					}
 					return false;

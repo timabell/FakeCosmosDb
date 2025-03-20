@@ -19,7 +19,7 @@ public class CosmosDbSqlQueryParser()
 
 		// If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
 		if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
-		    (query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
+			(query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
 		{
 			FallbackParseOrderByAndLimit(query, result);
 		}
@@ -211,7 +211,7 @@ public class CosmosDbSqlQueryParser()
 				{
 					// For BETWEEN operator with two constant values
 					if (betweenExpr.LowerBound is ConstantExpression lowerConstExpr &&
-					    betweenExpr.UpperBound is ConstantExpression upperConstExpr)
+						betweenExpr.UpperBound is ConstantExpression upperConstExpr)
 					{
 						// Create a single BETWEEN condition
 						conditions.Add(new WhereCondition
@@ -272,9 +272,9 @@ public class CosmosDbSqlQueryParser()
 			string functionName = functionCall.FunctionName.ToUpperInvariant();
 
 			if ((functionName == "CONTAINS" || functionName == "STARTSWITH") &&
-			    functionCall.Arguments.Count >= 2 &&
-			    functionCall.Arguments[0] is PropertyExpression propExpr &&
-			    functionCall.Arguments[1] is ConstantExpression constExpr)
+				functionCall.Arguments.Count >= 2 &&
+				functionCall.Arguments[0] is PropertyExpression propExpr &&
+				functionCall.Arguments[1] is ConstantExpression constExpr)
 			{
 				var op = functionName == "CONTAINS" ? ComparisonOperator.StringContains : ComparisonOperator.StringStartsWith;
 
@@ -287,8 +287,8 @@ public class CosmosDbSqlQueryParser()
 
 				// For CONTAINS with 3 arguments, the third is a boolean for case-insensitivity
 				if (functionName == "CONTAINS" && functionCall.Arguments.Count == 3 &&
-				    functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
-				    caseInsensitiveArg.Value is bool ignoreCase)
+					functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
+					caseInsensitiveArg.Value is bool ignoreCase)
 				{
 					whereCondition.IgnoreCase = ignoreCase;
 				}
@@ -296,8 +296,8 @@ public class CosmosDbSqlQueryParser()
 				conditions.Add(whereCondition);
 			}
 			else if (functionName == "IS_NULL" &&
-			         functionCall.Arguments.Count == 1 &&
-			         functionCall.Arguments[0] is PropertyExpression propNullExpr)
+					 functionCall.Arguments.Count == 1 &&
+					 functionCall.Arguments[0] is PropertyExpression propNullExpr)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -307,8 +307,8 @@ public class CosmosDbSqlQueryParser()
 				});
 			}
 			else if (functionName == "IS_DEFINED" &&
-			         functionCall.Arguments.Count == 1 &&
-			         functionCall.Arguments[0] is PropertyExpression propDefinedExpr)
+					 functionCall.Arguments.Count == 1 &&
+					 functionCall.Arguments[0] is PropertyExpression propDefinedExpr)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -319,9 +319,9 @@ public class CosmosDbSqlQueryParser()
 				});
 			}
 			else if (functionName == "ARRAY_CONTAINS" &&
-			         functionCall.Arguments.Count == 2 &&
-			         functionCall.Arguments[0] is PropertyExpression propArrayExpr &&
-			         functionCall.Arguments[1] is ConstantExpression constArrayExpr)
+					 functionCall.Arguments.Count == 2 &&
+					 functionCall.Arguments[0] is PropertyExpression propArrayExpr &&
+					 functionCall.Arguments[1] is ConstantExpression constArrayExpr)
 			{
 				conditions.Add(new WhereCondition
 				{

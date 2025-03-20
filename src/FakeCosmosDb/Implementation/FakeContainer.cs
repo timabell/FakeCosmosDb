@@ -123,7 +123,7 @@ public class FakeContainer : Container
 				var docId = doc["id"]?.ToString();
 				var docAltId = doc["Id"]?.ToString();
 				return (docId != null && docId.Equals(id, StringComparison.OrdinalIgnoreCase)) ||
-				       (docAltId != null && docAltId.Equals(id, StringComparison.OrdinalIgnoreCase));
+					   (docAltId != null && docAltId.Equals(id, StringComparison.OrdinalIgnoreCase));
 			});
 		}
 		else
@@ -140,7 +140,7 @@ public class FakeContainer : Container
 				var docAltId = doc["Id"]?.ToString();
 
 				if ((docId != null && docId.Equals(id, StringComparison.OrdinalIgnoreCase)) ||
-				    (docAltId != null && docAltId.Equals(id, StringComparison.OrdinalIgnoreCase)))
+					(docAltId != null && docAltId.Equals(id, StringComparison.OrdinalIgnoreCase)))
 				{
 					idMatches = true;
 				}
@@ -152,9 +152,9 @@ public class FakeContainer : Container
 				var docAltPk = doc["PartitionKey"]?.ToString();
 
 				if ((docPkPath != null && docPkPath == partitionKeyValue) ||
-				    (docPk != null && docPk == partitionKeyValue) ||
-				    (docAltPk != null && docAltPk == partitionKeyValue) ||
-				    (string.IsNullOrEmpty(docPk) && string.IsNullOrEmpty(docAltPk) && id == partitionKeyValue))
+					(docPk != null && docPk == partitionKeyValue) ||
+					(docAltPk != null && docAltPk == partitionKeyValue) ||
+					(string.IsNullOrEmpty(docPk) && string.IsNullOrEmpty(docAltPk) && id == partitionKeyValue))
 				{
 					pkMatches = true;
 				}

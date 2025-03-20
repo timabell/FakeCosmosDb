@@ -9,7 +9,7 @@ public class OrderInfo
 	/// The property path to order by.
 	/// </summary>
 	public string PropertyPath { get; set; }
-	
+
 	/// <summary>
 	/// The direction to sort in (ASC or DESC).
 	/// </summary>

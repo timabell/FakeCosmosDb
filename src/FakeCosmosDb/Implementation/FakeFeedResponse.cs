@@ -13,7 +13,7 @@ public class FakeFeedResponse<T>(IEnumerable<T> items, string continuationToken)
 	public override HttpStatusCode StatusCode => HttpStatusCode.OK;
 	public override IEnumerable<T> Resource => items;
 	public override CosmosDiagnostics Diagnostics => null;
-	
+
 	// FeedResponse<T> implementation
 	public override string IndexMetrics => string.Empty;
 	public override Headers Headers => new();
@@ -23,6 +23,6 @@ public class FakeFeedResponse<T>(IEnumerable<T> items, string continuationToken)
 	public override string ETag => string.Empty;
 	public override IEnumerator<T> GetEnumerator() => items.GetEnumerator();
 	public override int Count => items.Count();
-	
+
 	IEnumerator IEnumerable.GetEnumerator() => items.GetEnumerator();
 }
