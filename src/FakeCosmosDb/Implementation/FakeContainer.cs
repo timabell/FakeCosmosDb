@@ -475,11 +475,9 @@ public class FakeContainer : Container
 					// Return with the continuation token
 					return new FakeFeedResponse<T>(convertedResults, paginationResult.Item2);
 				}
-				else
-				{
-					// Initialize the enumerator for non-paginated results
-					_enumerator = _queryResults.GetEnumerator();
-				}
+
+				// Initialize the enumerator for non-paginated results
+				_enumerator = _queryResults.GetEnumerator();
 			}
 
 			// Handle non-paginated or post-pagination enumeration
@@ -538,24 +536,25 @@ public class FakeContainer : Container
 			{
 				return $"'{EscapeSqlString(stringValue)}'";
 			}
-			else if (value is DateTime dateTimeValue)
+
+			if (value is DateTime dateTimeValue)
 			{
 				return $"'{dateTimeValue:yyyy-MM-ddTHH:mm:ss.FFFFFFF}'";
 			}
-			else if (value is bool boolValue)
+
+			if (value is bool boolValue)
 			{
 				return boolValue ? "true" : "false";
 			}
-			else if (value is decimal || value is double || value is float)
+
+			if (value is decimal || value is double || value is float)
 			{
 				// Ensure decimal point is included for numeric values
 				return Convert.ToString(value, CultureInfo.InvariantCulture);
 			}
-			else
-			{
-				// Handle other types like int, long, etc.
-				return Convert.ToString(value, CultureInfo.InvariantCulture);
-			}
+
+			// Handle other types like int, long, etc.
+			return Convert.ToString(value, CultureInfo.InvariantCulture);
 		}
 
 		// Helper method to escape single quotes in SQL strings
