@@ -46,7 +46,7 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		return newDatabase;
 	}
 
-	public override Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new NotImplementedException();
 	}
@@ -76,7 +76,7 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		throw new NotImplementedException();
 	}
 
-	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		var database = GetOrCreateDatabase(id);
 		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(database));
@@ -102,7 +102,7 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		return GetOrCreateDatabase(databaseName);
 	}
 
-	public override Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new NotImplementedException();
 	}
@@ -119,14 +119,4 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 		// Don't call base.Dispose(disposing) to prevent NullReferenceException.
 		// The base implementation tries to dispose resources we don't have.
 	}
-}
-
-public class FakeDatabaseResponse : DatabaseResponse
-{
-	public FakeDatabaseResponse(FakeDatabase database)
-	{
-		Database = database;
-	}
-
-	public override Database Database { get; }
 }

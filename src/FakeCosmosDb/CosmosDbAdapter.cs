@@ -44,7 +44,7 @@ public class CosmosDbAdapter : ICosmosDb
 		_cosmosClient = new CosmosClient(cosmosOptionsAccountEndpoint, cosmosOptionsAccountKey, clientOptions);
 	}
 
-	public Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		return _cosmosClient.CreateDatabaseStreamAsync(databaseProperties, throughput, requestOptions, cancellationToken);
 	}
@@ -74,7 +74,7 @@ public class CosmosDbAdapter : ICosmosDb
 		return _cosmosClient.GetDatabaseQueryStreamIterator(queryText, continuationToken, requestOptions);
 	}
 
-	public Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		return _cosmosClient.CreateDatabaseIfNotExistsAsync(id, throughputProperties, requestOptions, cancellationToken);
 	}
@@ -94,7 +94,7 @@ public class CosmosDbAdapter : ICosmosDb
 		return _cosmosClient.GetDatabase(databaseName);
 	}
 
-	public Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		return _cosmosClient.CreateDatabaseAsync(id, throughputProperties, requestOptions, cancellationToken);
 	}

@@ -6,59 +6,48 @@ using Newtonsoft.Json.Linq;
 
 namespace TimAbell.FakeCosmosDb.SqlParser;
 
-public class CosmosDbSqlQueryParser
+public class CosmosDbSqlQueryParser(ILogger logger)
 {
-	private readonly ILogger _logger;
-
-	public CosmosDbSqlQueryParser() : this(null)
-	{
-	}
-
-	public CosmosDbSqlQueryParser(ILogger logger)
-	{
-		_logger = logger;
-	}
-
 	/// <summary>
 	/// Parses a CosmosDB SQL query using the Sprache grammar.
 	/// </summary>
 	public ParsedQuery Parse(string query)
 	{
-		_logger?.LogDebug($"SpracheSqlQueryParser: Parsing query '{query}'");
+		logger?.LogDebug($"SpracheSqlQueryParser: Parsing query '{query}'");
 
 		try
 		{
 			// First try to parse with the grammar
 			var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
-			_logger?.LogDebug($"SpracheSqlQueryParser: Successfully parsed AST: {parsedQuery}");
+			logger?.LogDebug($"SpracheSqlQueryParser: Successfully parsed AST: {parsedQuery}");
 
 			var result = ConvertToLegacyParsedQuery(parsedQuery);
 
 			// Log the extracted WHERE conditions for debugging
 			if (result.WhereConditions != null)
 			{
-				_logger?.LogDebug($"SpracheSqlQueryParser: Extracted {result.WhereConditions.Count} WHERE conditions:");
+				logger?.LogDebug($"SpracheSqlQueryParser: Extracted {result.WhereConditions.Count} WHERE conditions:");
 				foreach (var condition in result.WhereConditions)
 				{
-					_logger?.LogDebug($"  - {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
+					logger?.LogDebug($"  - {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
 				}
 			}
 			else
 			{
-				_logger?.LogDebug("SpracheSqlQueryParser: No WHERE conditions extracted");
+				logger?.LogDebug("SpracheSqlQueryParser: No WHERE conditions extracted");
 			}
 
 			// Log the legacy parsed query properties
-			_logger?.LogDebug($"SpracheSqlQueryParser: Legacy ParsedQuery: FromName={result.FromName}, FromAlias={result.FromAlias}");
-			_logger?.LogDebug($"SpracheSqlQueryParser: PropertyPaths={string.Join(", ", result.PropertyPaths)}");
-			_logger?.LogDebug($"SpracheSqlQueryParser: Limit={result.Limit}");
-			_logger?.LogDebug($"SpracheSqlQueryParser: TopValue={result.TopValue}");
+			logger?.LogDebug($"SpracheSqlQueryParser: Legacy ParsedQuery: FromName={result.FromName}, FromAlias={result.FromAlias}");
+			logger?.LogDebug($"SpracheSqlQueryParser: PropertyPaths={string.Join(", ", result.PropertyPaths)}");
+			logger?.LogDebug($"SpracheSqlQueryParser: Limit={result.Limit}");
+			logger?.LogDebug($"SpracheSqlQueryParser: TopValue={result.TopValue}");
 
 			// If ORDER BY or LIMIT wasn't parsed correctly, try direct string parsing as fallback
 			if ((query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null) ||
 				(query.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) && result.Limit == 0))
 			{
-				_logger?.LogDebug("SpracheSqlQueryParser: Using fallback parser for ORDER BY and LIMIT");
+				logger?.LogDebug("SpracheSqlQueryParser: Using fallback parser for ORDER BY and LIMIT");
 				FallbackParseOrderByAndLimit(query, result);
 			}
 
@@ -66,7 +55,7 @@ public class CosmosDbSqlQueryParser
 		}
 		catch (Exception ex)
 		{
-			_logger?.LogError(ex, $"SpracheSqlQueryParser: Error parsing query: {ex.Message}");
+			logger?.LogError(ex, $"SpracheSqlQueryParser: Error parsing query: {ex.Message}");
 			throw new FormatException($"Failed to parse CosmosDB SQL query: {ex.Message}", ex);
 		}
 	}
@@ -131,7 +120,7 @@ public class CosmosDbSqlQueryParser
 	/// Converts the new AST-based parsed query to the legacy ParsedQuery format
 	/// for compatibility with existing code.
 	/// </summary>
-	private ParsedQuery ConvertToLegacyParsedQuery(CosmosDbSqlQuery query)
+	private ParsedQuery ConvertToLegacyParsedQuery(CosmosDbSqlQuery query) // todo: eliminate
 	{
 		var result = new ParsedQuery
 		{
@@ -392,7 +381,7 @@ public class CosmosDbSqlQueryParser
 	/// <summary>
 	/// Reverses a binary operator for reversed operand order
 	/// </summary>
-	private BinaryOperator GetReversedOperator(BinaryOperator op)
+	private static BinaryOperator GetReversedOperator(BinaryOperator op)
 	{
 		return op switch
 		{
@@ -407,7 +396,7 @@ public class CosmosDbSqlQueryParser
 	/// <summary>
 	/// Converts a BinaryOperator enum value to its ComparisonOperator representation.
 	/// </summary>
-	private ComparisonOperator GetComparisonOperator(BinaryOperator op)
+	private static ComparisonOperator GetComparisonOperator(BinaryOperator op)
 	{
 		return op switch
 		{
@@ -426,7 +415,7 @@ public class CosmosDbSqlQueryParser
 	/// Fallback method to parse ORDER BY and LIMIT clauses directly from the SQL string
 	/// when the grammar parser fails to handle them.
 	/// </summary>
-	private void FallbackParseOrderByAndLimit(string query, ParsedQuery result)
+	private void FallbackParseOrderByAndLimit(string query, ParsedQuery result) // todo: move to AST
 	{
 		// Handle ORDER BY
 		if (query.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase) && result.OrderBy == null)
@@ -501,110 +490,4 @@ public class CosmosDbSqlQueryParser
 			}
 		}
 	}
-}
-
-/// <summary>
-/// Represents a parsed CosmosDB SQL query.
-/// </summary>
-public class ParsedQuery
-{
-	/// <summary>
-	/// The parsed SQL query using the Sprache SQL parser.
-	/// </summary>
-	public CosmosDbSqlQuery SprachedSqlAst { get; set; }
-
-	/// <summary>
-	/// List of property paths to select from the results.
-	/// </summary>
-	public List<string> PropertyPaths { get; set; } = new List<string>();
-
-	/// <summary>
-	/// The name of the container or collection in the FROM clause.
-	/// </summary>
-	public string FromName { get; set; }
-
-	/// <summary>
-	/// The alias used for the FROM source, if any.
-	/// </summary>
-	public string FromAlias { get; set; }
-
-	/// <summary>
-	/// List of conditions in the WHERE clause.
-	/// </summary>
-	public List<WhereCondition> WhereConditions { get; set; } = new List<WhereCondition>();
-
-	/// <summary>
-	/// The complete expression tree for the WHERE clause.
-	/// This is used for complex expressions that can't be easily represented as simple conditions,
-	/// such as those involving NOT operator or complex logical combinations.
-	/// </summary>
-	public Expression WhereExpression { get; set; }
-
-	/// <summary>
-	/// List of ORDER BY clauses.
-	/// </summary>
-	public List<OrderInfo> OrderBy { get; set; }
-
-	/// <summary>
-	/// LIMIT value, if any.
-	/// </summary>
-	public int Limit { get; set; }
-
-	/// <summary>
-	/// TOP value, if any.
-	/// </summary>
-	public int TopValue { get; set; }
-
-	/// <summary>
-	/// Whether this is a SELECT * query.
-	/// </summary>
-	public bool IsSelectAll => PropertyPaths.Count == 1 && PropertyPaths[0] == "*";
-}
-
-/// <summary>
-/// Represents a condition in a WHERE clause.
-/// </summary>
-public class WhereCondition
-{
-	/// <summary>
-	/// The property path to test.
-	/// </summary>
-	public string PropertyPath { get; set; }
-
-	/// <summary>
-	/// The operator to apply.
-	/// </summary>
-	public ComparisonOperator Operator { get; set; }
-
-	/// <summary>
-	/// The value to compare with.
-	/// </summary>
-	public JToken Value { get; set; }
-
-	/// <summary>
-	/// The parameter name to compare with.
-	/// </summary>
-	public string ParameterName { get; set; }
-
-	/// <summary>
-	/// For CONTAINS function, indicates whether the search should be case-insensitive.
-	/// When true, the search is case-insensitive. When false or null, the search is case-sensitive.
-	/// </summary>
-	public bool? IgnoreCase { get; set; }
-}
-
-/// <summary>
-/// Represents an ORDER BY clause.
-/// </summary>
-public class OrderInfo
-{
-	/// <summary>
-	/// The property path to order by.
-	/// </summary>
-	public string PropertyPath { get; set; }
-
-	/// <summary>
-	/// The direction to sort in (ASC or DESC).
-	/// </summary>
-	public SortDirection Direction { get; set; } = SortDirection.Ascending;
 }

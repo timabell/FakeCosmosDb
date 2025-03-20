@@ -9,7 +9,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlParserTests;
 
 public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 {
-	private readonly CosmosDbSqlQueryParser _parser = new CosmosDbSqlQueryParser(new TestLogger(output));
+	private readonly CosmosDbSqlQueryParser _parser = new(new TestLogger(output));
 
 	[Fact]
 	public void ShouldParseSimpleSelectQuery()
