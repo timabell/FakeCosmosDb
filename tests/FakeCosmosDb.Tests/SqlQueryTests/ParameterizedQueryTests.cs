@@ -182,7 +182,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var resultsBetween = await ExecuteQueryAsync<TestItemWithDecimal>(container, queryDefinitionBetween);
 			
 			_output.WriteLine($"Between query returned {resultsBetween.Count()} items");
-			resultsBetween.Count().Should().Be(3);
+			resultsBetween.Count().Should().Be(4);
 			resultsBetween.All(i => i.Price >= 25.99m && i.Price <= 35.75m).Should().BeTrue();
 		}
 
