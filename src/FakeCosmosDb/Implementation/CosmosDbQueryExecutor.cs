@@ -1653,7 +1653,7 @@ public class CosmosDbQueryExecutor
 	{
 		if (_logger != null)
 		{
-			_logger.LogDebug("Evaluating function: {name} with {count} arguments", 
+			_logger.LogDebug("Evaluating function: {name} with {count} arguments",
 				function.Name, function.Arguments.Count);
 		}
 
@@ -1801,9 +1801,9 @@ public class CosmosDbQueryExecutor
 				}
 
 				var argValue = EvaluateValue(item, function.Arguments[0], parameters);
-				bool argIsNull = argValue == null || 
-				                 argValue == DBNull.Value || 
-				                 (argValue is JValue jv && jv.Type == JTokenType.Null);
+				bool argIsNull = argValue == null ||
+								 argValue == DBNull.Value ||
+								 (argValue is JValue jv && jv.Type == JTokenType.Null);
 
 				if (_logger != null)
 				{
@@ -1825,7 +1825,7 @@ public class CosmosDbQueryExecutor
 
 					if (_logger != null)
 					{
-						_logger.LogDebug("IS_DEFINED: Property '{path}' is {result}", 
+						_logger.LogDebug("IS_DEFINED: Property '{path}' is {result}",
 							isDefinedPropExpr.PropertyPath, isDefined ? "defined" : "not defined");
 					}
 
