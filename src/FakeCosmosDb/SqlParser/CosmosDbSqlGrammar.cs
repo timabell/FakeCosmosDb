@@ -23,11 +23,15 @@ public static class CosmosDbSqlGrammar
 	// SQL keywords (case insensitive)
 	private static Parser<string> Keyword(string word)
 	{
-		return Parse.IgnoreCase(word).Text().Token();
+		// Ensure we match the entire word and not just a prefix of another word
+		return Parse.IgnoreCase(word)
+			.Then(x => Parse.WhiteSpace.AtLeastOnce().Or(Parse.Not(Parse.LetterOrDigit)).Return(word))
+			.Text()
+			.Token();
 	}
 
 	// Identifiers for table and column names
-	public static readonly Parser<string> Identifier =
+	private static readonly Parser<string> Identifier =
 		Parse.Letter.AtLeastOnce().Text().Then(first =>
 			Parse.LetterOrDigit.Or(Parse.Char('_')).Many().Text().Select(rest =>
 				first + rest
@@ -35,7 +39,7 @@ public static class CosmosDbSqlGrammar
 		);
 
 	// Parameter identifier (e.g. @param)
-	public static readonly Parser<string> ParameterIdentifier =
+	private static readonly Parser<string> ParameterIdentifier =
 		Parse.Char('@').Then(_ =>
 			Parse.Letter.AtLeastOnce().Text().Then(first =>
 				Parse.LetterOrDigit.Or(Parse.Char('_')).Many().Text().Select(rest =>
@@ -45,17 +49,17 @@ public static class CosmosDbSqlGrammar
 		);
 
 	// Property path (e.g., "c.Address.City")
-	public static readonly Parser<string> PropertyPath =
+	private static readonly Parser<string> PropertyPath =
 		Identifier.DelimitedBy(Parse.Char('.')).Select(parts => string.Join(".", parts));
 
 	// String literals
-	public static readonly Parser<string> StringLiteral =
+	private static readonly Parser<string> StringLiteral =
 		Parse.Char('\'').Then(_ =>
 			Parse.CharExcept('\'').Many().Text().Then(content =>
 				Parse.Char('\'').Return(content)));
 
 	// Numeric literals
-	public static readonly Parser<double> NumberLiteral =
+	private static readonly Parser<double> NumberLiteral =
 		Parse.Char('-').Optional().Then(sign =>
 			Parse.Digit.AtLeastOnce().Text().Then(whole =>
 				Parse.Char('.').Optional().Then(dot =>
@@ -68,16 +72,16 @@ public static class CosmosDbSqlGrammar
 						}))));
 
 	// Boolean literals
-	public static readonly Parser<bool> BooleanLiteral =
+	private static readonly Parser<bool> BooleanLiteral =
 		Keyword("true").Return(true)
 		.Or(Keyword("false").Return(false));
 
 	// Null literal
-	public static readonly Parser<object> NullLiteral =
+	private static readonly Parser<object> NullLiteral =
 		Keyword("null").Return((object)null);
 
 	// Any literal value
-	public static readonly Parser<object> Literal =
+	private static readonly Parser<object> Literal =
 		StringLiteral.Select(s => (object)s)
 		.Or(NumberLiteral.Select(n => (object)n))
 		.Or(BooleanLiteral.Select(b => (object)b))

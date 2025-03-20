@@ -1,5 +1,3 @@
-// Handles pagination with continuation tokens
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +12,7 @@ public interface ICosmosDbPaginationManager
 
 public class CosmosDbPaginationManager : ICosmosDbPaginationManager
 {
-	private readonly Dictionary<string, PaginationState> _paginationStates = new Dictionary<string, PaginationState>();
+	private readonly Dictionary<string, PaginationState> _paginationStates = new();
 
 	public (IEnumerable<JObject> Results, string ContinuationToken) GetPage(IEnumerable<JObject> results, int maxItemCount, string continuationToken = null)
 	{

@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.Tests.Utilities;
 using Xunit;
 using Xunit.Abstractions;
@@ -125,7 +124,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionEqual = new QueryDefinition("SELECT * FROM c WHERE c.Age = @age")
 				.WithParameter("@age", 30);
 			var resultsEqual = await ExecuteQueryAsync<TestItem>(container, queryDefinitionEqual);
-			
+
 			_output.WriteLine($"Equal query returned {resultsEqual.Count()} items");
 			resultsEqual.Count().Should().Be(2);
 			resultsEqual.All(i => i.Age == 30).Should().BeTrue();
@@ -134,7 +133,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionGreaterThan = new QueryDefinition("SELECT * FROM c WHERE c.Age > @minAge")
 				.WithParameter("@minAge", 30);
 			var resultsGreaterThan = await ExecuteQueryAsync<TestItem>(container, queryDefinitionGreaterThan);
-			
+
 			_output.WriteLine($"Greater Than query returned {resultsGreaterThan.Count()} items");
 			resultsGreaterThan.Count().Should().Be(2);
 			resultsGreaterThan.All(i => i.Age > 30).Should().BeTrue();
@@ -143,7 +142,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionLessThanOrEqual = new QueryDefinition("SELECT * FROM c WHERE c.Age <= @maxAge")
 				.WithParameter("@maxAge", 30);
 			var resultsLessThanOrEqual = await ExecuteQueryAsync<TestItem>(container, queryDefinitionLessThanOrEqual);
-			
+
 			_output.WriteLine($"Less Than or Equal query returned {resultsLessThanOrEqual.Count()} items");
 			resultsLessThanOrEqual.Count().Should().Be(3);
 			resultsLessThanOrEqual.All(i => i.Age <= 30).Should().BeTrue();
@@ -161,7 +160,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionEqual = new QueryDefinition("SELECT * FROM c WHERE c.Price = @price")
 				.WithParameter("@price", 30.50m);
 			var resultsEqual = await ExecuteQueryAsync<TestItemWithDecimal>(container, queryDefinitionEqual);
-			
+
 			_output.WriteLine($"Equal query returned {resultsEqual.Count()} items");
 			resultsEqual.Count().Should().Be(2);
 			resultsEqual.All(i => i.Price == 30.50m).Should().BeTrue();
@@ -170,7 +169,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionGreaterThan = new QueryDefinition("SELECT * FROM c WHERE c.Price > @minPrice")
 				.WithParameter("@minPrice", 30.50m);
 			var resultsGreaterThan = await ExecuteQueryAsync<TestItemWithDecimal>(container, queryDefinitionGreaterThan);
-			
+
 			_output.WriteLine($"Greater Than query returned {resultsGreaterThan.Count()} items");
 			resultsGreaterThan.Count().Should().Be(2);
 			resultsGreaterThan.All(i => i.Price > 30.50m).Should().BeTrue();
@@ -180,7 +179,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 				.WithParameter("@minPrice", 25.99m)
 				.WithParameter("@maxPrice", 35.75m);
 			var resultsBetween = await ExecuteQueryAsync<TestItemWithDecimal>(container, queryDefinitionBetween);
-			
+
 			_output.WriteLine($"Between query returned {resultsBetween.Count()} items");
 			resultsBetween.Count().Should().Be(4);
 			resultsBetween.All(i => i.Price >= 25.99m && i.Price <= 35.75m).Should().BeTrue();
@@ -198,7 +197,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionEqual = new QueryDefinition("SELECT * FROM c WHERE c.Name = @name")
 				.WithParameter("@name", "Alice");
 			var resultsEqual = await ExecuteQueryAsync<TestItemWithStrings>(container, queryDefinitionEqual);
-			
+
 			_output.WriteLine($"Equal query returned {resultsEqual.Count()} items");
 			resultsEqual.Count().Should().Be(1);
 			resultsEqual.All(i => i.Name == "Alice").Should().BeTrue();
@@ -207,7 +206,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionContains = new QueryDefinition("SELECT * FROM c WHERE CONTAINS(c.Email, @domain)")
 				.WithParameter("@domain", "example.com");
 			var resultsContains = await ExecuteQueryAsync<TestItemWithStrings>(container, queryDefinitionContains);
-			
+
 			_output.WriteLine($"Contains query returned {resultsContains.Count()} items");
 			resultsContains.Count().Should().Be(5);
 			resultsContains.All(i => i.Email.Contains("example.com")).Should().BeTrue();
@@ -216,7 +215,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionStartsWith = new QueryDefinition("SELECT * FROM c WHERE STARTSWITH(c.Name, @prefix)")
 				.WithParameter("@prefix", "A");
 			var resultsStartsWith = await ExecuteQueryAsync<TestItemWithStrings>(container, queryDefinitionStartsWith);
-			
+
 			_output.WriteLine($"StartsWith query returned {resultsStartsWith.Count()} items");
 			resultsStartsWith.Count().Should().Be(2);
 			resultsStartsWith.All(i => i.Name.StartsWith("A")).Should().BeTrue();
@@ -235,7 +234,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionEqual = new QueryDefinition("SELECT * FROM c WHERE c.CreatedDate = @date")
 				.WithParameter("@date", specificDate);
 			var resultsEqual = await ExecuteQueryAsync<TestItemWithDates>(container, queryDefinitionEqual);
-			
+
 			_output.WriteLine($"Equal date query returned {resultsEqual.Count()} items");
 			resultsEqual.Count().Should().Be(2);
 			resultsEqual.All(i => i.CreatedDate == specificDate).Should().BeTrue();
@@ -245,7 +244,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionGreaterThan = new QueryDefinition("SELECT * FROM c WHERE c.CreatedDate > @minDate")
 				.WithParameter("@minDate", minDate);
 			var resultsGreaterThan = await ExecuteQueryAsync<TestItemWithDates>(container, queryDefinitionGreaterThan);
-			
+
 			_output.WriteLine($"Greater Than date query returned {resultsGreaterThan.Count()} items");
 			resultsGreaterThan.Count().Should().Be(2);
 			resultsGreaterThan.All(i => i.CreatedDate > minDate).Should().BeTrue();
@@ -257,7 +256,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 				.WithParameter("@startDate", startDate)
 				.WithParameter("@endDate", endDate);
 			var resultsBetween = await ExecuteQueryAsync<TestItemWithDates>(container, queryDefinitionBetween);
-			
+
 			_output.WriteLine($"Between dates query returned {resultsBetween.Count()} items");
 			resultsBetween.Count().Should().Be(3);
 			resultsBetween.All(i => i.CreatedDate >= startDate && i.CreatedDate <= endDate).Should().BeTrue();
@@ -276,7 +275,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 				.WithParameter("@minAge", 30)
 				.WithParameter("@isActive", true);
 			var resultsAnd = await ExecuteQueryAsync<TestItem>(container, queryDefinitionAnd);
-			
+
 			_output.WriteLine($"AND query returned {resultsAnd.Count()} items");
 			resultsAnd.Count().Should().Be(1);
 			resultsAnd.All(i => i.Age > 30 && i.IsActive).Should().BeTrue();
@@ -286,7 +285,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 				.WithParameter("@age", 30)
 				.WithParameter("@id", "1");
 			var resultsOr = await ExecuteQueryAsync<TestItem>(container, queryDefinitionOr);
-			
+
 			_output.WriteLine($"OR query returned {resultsOr.Count()} items");
 			resultsOr.Count().Should().Be(3);
 			resultsOr.All(i => i.Age == 30 || i.Id == "1").Should().BeTrue();
@@ -295,7 +294,7 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlQueryTests
 			var queryDefinitionNot = new QueryDefinition("SELECT * FROM c WHERE NOT (c.Age <= @maxAge)")
 				.WithParameter("@maxAge", 30);
 			var resultsNot = await ExecuteQueryAsync<TestItem>(container, queryDefinitionNot);
-			
+
 			_output.WriteLine($"NOT query returned {resultsNot.Count()} items");
 			resultsNot.Count().Should().Be(2);
 			resultsNot.All(i => !(i.Age <= 30)).Should().BeTrue();

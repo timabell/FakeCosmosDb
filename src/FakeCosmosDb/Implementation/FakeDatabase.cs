@@ -7,20 +7,13 @@ using Microsoft.Extensions.Logging;
 
 namespace TimAbell.FakeCosmosDb.Implementation;
 
-public class FakeDatabase : Database
+public class FakeDatabase(string databaseName, ILogger logger = null) : Database
 {
-	public override string Id => _databaseName;
-	public override CosmosClient Client { get; }
-	private readonly string _databaseName;
-	private readonly ILogger _logger;
+	public override string Id => databaseName;
+	public override CosmosClient Client => throw new System.NotImplementedException();
+
 	// Dictionary to store containers in this database, keyed by container ID
 	private readonly Dictionary<string, FakeContainer> _containers = new();
-
-	public FakeDatabase(string databaseName, ILogger logger = null)
-	{
-		_databaseName = databaseName;
-		_logger = logger;
-	}
 
 	// Get or create a container in this database
 	public FakeContainer GetOrCreateContainer(string containerId, string partitionKeyPath = "/id")
@@ -30,7 +23,7 @@ public class FakeDatabase : Database
 			return existingContainer;
 		}
 
-		var newContainer = new FakeContainer(_logger)
+		var newContainer = new FakeContainer(logger)
 		{
 			PartitionKeyPath = partitionKeyPath
 		};
@@ -38,57 +31,57 @@ public class FakeDatabase : Database
 		return newContainer;
 	}
 
-	public override Task<DatabaseResponse> ReadAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<DatabaseResponse> ReadAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<DatabaseResponse> DeleteAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<DatabaseResponse> DeleteAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<int?> ReadThroughputAsync(CancellationToken cancellationToken = new CancellationToken())
+	public override Task<int?> ReadThroughputAsync(CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ThroughputResponse> ReadThroughputAsync(RequestOptions requestOptions, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ThroughputResponse> ReadThroughputAsync(RequestOptions requestOptions, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ThroughputResponse> ReplaceThroughputAsync(ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ThroughputResponse> ReplaceThroughputAsync(ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ContainerResponse> CreateContainerAsync(ContainerProperties containerProperties, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ContainerResponse> CreateContainerAsync(ContainerProperties containerProperties, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(ContainerProperties containerProperties, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(ContainerProperties containerProperties, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ResponseMessage> CreateContainerStreamAsync(ContainerProperties containerProperties, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ResponseMessage> CreateContainerStreamAsync(ContainerProperties containerProperties, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ThroughputResponse> ReplaceThroughputAsync(int throughput, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ThroughputResponse> ReplaceThroughputAsync(int throughput, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ResponseMessage> ReadStreamAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ResponseMessage> ReadStreamAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ResponseMessage> DeleteStreamAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ResponseMessage> DeleteStreamAsync(RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
@@ -98,7 +91,7 @@ public class FakeDatabase : Database
 		return GetOrCreateContainer(id);
 	}
 
-	public override Task<ContainerResponse> CreateContainerAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ContainerResponse> CreateContainerAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		var container = new FakeContainer();
 		_containers[containerProperties.Id] = container;
@@ -106,12 +99,12 @@ public class FakeDatabase : Database
 		return Task.FromResult<ContainerResponse>(response);
 	}
 
-	public override Task<ContainerResponse> CreateContainerAsync(string id, string partitionKeyPath, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ContainerResponse> CreateContainerAsync(string id, string partitionKeyPath, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override async Task<ContainerResponse> CreateContainerIfNotExistsAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override async Task<ContainerResponse> CreateContainerIfNotExistsAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		if (!_containers.TryGetValue(containerProperties.Id, out var container))
 		{
@@ -120,12 +113,12 @@ public class FakeDatabase : Database
 		return new FakeContainerResponse(container);
 	}
 
-	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(string id, string partitionKeyPath, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ContainerResponse> CreateContainerIfNotExistsAsync(string id, string partitionKeyPath, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ResponseMessage> CreateContainerStreamAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ResponseMessage> CreateContainerStreamAsync(ContainerProperties containerProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
@@ -135,12 +128,12 @@ public class FakeDatabase : Database
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<UserResponse> CreateUserAsync(string id, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<UserResponse> CreateUserAsync(string id, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<UserResponse> UpsertUserAsync(string id, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<UserResponse> UpsertUserAsync(string id, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
@@ -190,21 +183,8 @@ public class FakeDatabase : Database
 		throw new System.NotImplementedException();
 	}
 
-	public override Task<ClientEncryptionKeyResponse> CreateClientEncryptionKeyAsync(ClientEncryptionKeyProperties clientEncryptionKeyProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
+	public override Task<ClientEncryptionKeyResponse> CreateClientEncryptionKeyAsync(ClientEncryptionKeyProperties clientEncryptionKeyProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new())
 	{
 		throw new System.NotImplementedException();
 	}
-}
-
-public class FakeContainerResponse : ContainerResponse
-{
-	private Container _container;
-
-	public FakeContainerResponse(Container container)
-	{
-		_container = container;
-		// StatusCode = HttpStatusCode.Created;
-	}
-
-	public override Container Container => _container;
 }
