@@ -1,6 +1,5 @@
 using System.Linq;
 using FluentAssertions;
-using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.SqlParser;
 using Xunit;
 using Xunit.Abstractions;
@@ -9,8 +8,6 @@ namespace TimAbell.FakeCosmosDb.Tests.SqlParserTests;
 
 public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 {
-	private readonly CosmosDbSqlQueryParser _parser = new();
-
 	[Fact]
 	public void ShouldParseSimpleSelectQuery()
 	{
@@ -18,12 +15,12 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
 	}
 
 	[Fact]
@@ -33,15 +30,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT c.id, c.name, c.address.city FROM c";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.Items.Should().HaveCount(3);
-		result.SprachedSqlAst.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.id");
-		result.SprachedSqlAst.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.name");
-		result.SprachedSqlAst.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.address.city");
-		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.Should().NotBeNull();
+		result.Select.Items.Should().HaveCount(3);
+		result.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.id");
+		result.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.name");
+		result.Select.Items.OfType<PropertySelectItem>().Select(i => i.PropertyPath).Should().Contain("c.address.city");
+		result.From.Source.Should().Be("c");
 	}
 
 	[Fact]
@@ -51,15 +48,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.age > 21";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var whereCondition = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var whereCondition = result.Where.Condition as BinaryExpression;
 		whereCondition.Should().NotBeNull();
 		whereCondition.Operator.Should().Be(BinaryOperator.GreaterThan);
 
@@ -79,15 +76,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.age > 21 AND c.name = 'John'";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var andExpression = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var andExpression = result.Where.Condition as BinaryExpression;
 		andExpression.Should().NotBeNull();
 		andExpression.Operator.Should().Be(BinaryOperator.And);
 
@@ -125,20 +122,20 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c ORDER BY c.age DESC, c.name ASC";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.OrderBy.Should().NotBeNull();
-		result.SprachedSqlAst.OrderBy.Items.Should().HaveCount(2);
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.OrderBy.Should().NotBeNull();
+		result.OrderBy.Items.Should().HaveCount(2);
 
-		result.SprachedSqlAst.OrderBy.Items[0].PropertyPath.Should().Be("c.age");
-		result.SprachedSqlAst.OrderBy.Items[0].Descending.Should().BeTrue();
+		result.OrderBy.Items[0].PropertyPath.Should().Be("c.age");
+		result.OrderBy.Items[0].Descending.Should().BeTrue();
 
-		result.SprachedSqlAst.OrderBy.Items[1].PropertyPath.Should().Be("c.name");
-		result.SprachedSqlAst.OrderBy.Items[1].Descending.Should().BeFalse();
+		result.OrderBy.Items[1].PropertyPath.Should().Be("c.name");
+		result.OrderBy.Items[1].Descending.Should().BeFalse();
 	}
 
 	[Fact]
@@ -148,14 +145,14 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c LIMIT 10";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Limit.Should().NotBeNull();
-		result.SprachedSqlAst.Limit.Value.Should().Be(10);
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Limit.Should().NotBeNull();
+		result.Limit.Value.Should().Be(10);
 	}
 
 	[Fact]
@@ -165,15 +162,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE CONTAINS(c.name, 'John')";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		var whereCondition = result.Where.Condition as FunctionCallExpression;
 		whereCondition.Should().NotBeNull();
 		whereCondition.FunctionName.Should().Be("CONTAINS");
 		whereCondition.Arguments.Should().HaveCount(2);
@@ -194,15 +191,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE CONTAINS(c.name, 'John', false)";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		var whereCondition = result.Where.Condition as FunctionCallExpression;
 		whereCondition.Should().NotBeNull();
 		whereCondition.FunctionName.Should().Be("CONTAINS");
 		whereCondition.Arguments.Should().HaveCount(3);
@@ -227,15 +224,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE CONTAINS(c.name, 'John', true)";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		var whereCondition = result.Where.Condition as FunctionCallExpression;
 		whereCondition.Should().NotBeNull();
 		whereCondition.FunctionName.Should().Be("CONTAINS");
 		whereCondition.Arguments.Should().HaveCount(3);
@@ -260,15 +257,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE STARTSWITH(c.name, 'J')";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var whereCondition = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		var whereCondition = result.Where.Condition as FunctionCallExpression;
 		whereCondition.Should().NotBeNull();
 		whereCondition.FunctionName.Should().Be("STARTSWITH");
 		whereCondition.Arguments.Should().HaveCount(2);
@@ -289,15 +286,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.age BETWEEN 18.8 AND 65.9";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var binaryExpr = result.Where.Condition as BinaryExpression;
 		binaryExpr.Should().NotBeNull();
 		binaryExpr.Operator.Should().Be(BinaryOperator.Between);
 
@@ -324,15 +321,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.age BETWEEN 18 AND 65";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var binaryExpr = result.Where.Condition as BinaryExpression;
 		binaryExpr.Should().NotBeNull();
 		binaryExpr.Operator.Should().Be(BinaryOperator.Between);
 
@@ -359,15 +356,15 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.name BETWEEN 'A' AND 'M'";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var binaryExpr = result.Where.Condition as BinaryExpression;
 		binaryExpr.Should().NotBeNull();
 		binaryExpr.Operator.Should().Be(BinaryOperator.Between);
 
@@ -394,27 +391,27 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT c.id, c.name, c.age FROM c WHERE c.age > 21 AND CONTAINS(c.name, 'J') ORDER BY c.age DESC LIMIT 10";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
-		result.SprachedSqlAst.Should().NotBeNull();
+		result.Should().NotBeNull();
 
 		// Check SELECT
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeFalse();
-		result.SprachedSqlAst.Select.Items.Should().HaveCount(3);
+		result.Select.IsSelectAll.Should().BeFalse();
+		result.Select.Items.Should().HaveCount(3);
 
 		// Verify the property paths in the select items
-		var selectItems = result.SprachedSqlAst.Select.Items.Cast<PropertySelectItem>().ToList();
+		var selectItems = result.Select.Items.Cast<PropertySelectItem>().ToList();
 		selectItems[0].PropertyPath.Should().Be("c.id");
 		selectItems[1].PropertyPath.Should().Be("c.name");
 		selectItems[2].PropertyPath.Should().Be("c.age");
 
 		// Check FROM
-		result.SprachedSqlAst.From.Source.Should().Be("c");
+		result.From.Source.Should().Be("c");
 
 		// Check WHERE
-		result.SprachedSqlAst.Where.Should().NotBeNull();
-		var andExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		result.Where.Should().NotBeNull();
+		var andExpr = result.Where.Condition as BinaryExpression;
 		andExpr.Should().NotBeNull();
 		andExpr.Operator.Should().Be(BinaryOperator.And);
 
@@ -446,34 +443,33 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		containsValue.Value.Should().Be("J");
 
 		// Check ORDER BY
-		result.SprachedSqlAst.OrderBy.Should().NotBeNull();
-		result.SprachedSqlAst.OrderBy.Items.Should().HaveCount(1);
-		result.SprachedSqlAst.OrderBy.Items[0].PropertyPath.Should().Be("c.age");
-		result.SprachedSqlAst.OrderBy.Items[0].Descending.Should().BeTrue();
+		result.OrderBy.Should().NotBeNull();
+		result.OrderBy.Items.Should().HaveCount(1);
+		result.OrderBy.Items[0].PropertyPath.Should().Be("c.age");
+		result.OrderBy.Items[0].Descending.Should().BeTrue();
 
 		// Check LIMIT
-		result.SprachedSqlAst.Limit.Should().NotBeNull();
-		result.SprachedSqlAst.Limit.Value.Should().Be(10);
+		result.Limit.Should().NotBeNull();
+		result.Limit.Value.Should().Be(10);
 	}
 
 	[Fact]
 	public void ShouldHandleQuotedStringsInWhereConditions()
 	{
 		// Arrange
-		var parser = new CosmosDbSqlQueryParser();
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act
-		var result = parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var binaryExpr = result.Where.Condition as BinaryExpression;
 		binaryExpr.Should().NotBeNull();
 		binaryExpr.Operator.Should().Be(BinaryOperator.Equal);
 
@@ -490,24 +486,23 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 	public void ShouldHandleIntegrationTestQuery()
 	{
 		// This exact query is used in the integration test
-		var parser = new CosmosDbSqlQueryParser();
 		var sql = "SELECT * FROM c WHERE c.Name = 'Alice'";
 
 		// Act
-		var result = parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Output the debug info
-		output.WriteLine(CosmosDbSqlQueryParser.DumpDebugInfo(sql));
+		output.WriteLine(DebugQuery.DumpDebugInfo(sql));
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.From.Alias.Should().BeNull();
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.From.Alias.Should().BeNull();
+		result.Where.Should().NotBeNull();
 
-		var binaryExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var binaryExpr = result.Where.Condition as BinaryExpression;
 		binaryExpr.Should().NotBeNull();
 		binaryExpr.Operator.Should().Be(BinaryOperator.Equal);
 
@@ -527,16 +522,16 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE IS_NULL(c.optionalProperty)";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var isNullExpr = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		var isNullExpr = result.Where.Condition as FunctionCallExpression;
 		isNullExpr.Should().NotBeNull();
 		isNullExpr.FunctionName.Should().Be("IS_NULL");
 		isNullExpr.Arguments.Should().HaveCount(1);
@@ -553,16 +548,16 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE IS_DEFINED(c.optionalProperty)";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var isDefinedExpr = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		var isDefinedExpr = result.Where.Condition as FunctionCallExpression;
 		isDefinedExpr.Should().NotBeNull();
 		isDefinedExpr.FunctionName.Should().Be("IS_DEFINED");
 		isDefinedExpr.Arguments.Should().HaveCount(1);
@@ -579,16 +574,16 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE ARRAY_CONTAINS(c.tags, 'important')";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var arrayContainsExpr = result.SprachedSqlAst.Where.Condition as FunctionCallExpression;
+		var arrayContainsExpr = result.Where.Condition as FunctionCallExpression;
 		arrayContainsExpr.Should().NotBeNull();
 		arrayContainsExpr.FunctionName.Should().Be("ARRAY_CONTAINS");
 		arrayContainsExpr.Arguments.Should().HaveCount(2);
@@ -609,17 +604,17 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE IS_DEFINED(c.name) AND ARRAY_CONTAINS(c.tags, 'important') AND IS_NULL(c.deletedAt)";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
 		// First AND expression
-		var firstAndExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var firstAndExpr = result.Where.Condition as BinaryExpression;
 		firstAndExpr.Should().NotBeNull();
 		firstAndExpr.Operator.Should().Be(BinaryOperator.And);
 
@@ -670,17 +665,17 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE NOT (c.name = 'Alice')";
 
 		// Act
-		var result = _parser.Parse(sql);
-		output.WriteLine(CosmosDbSqlQueryParser.DumpDebugInfo(sql));
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
+		output.WriteLine(DebugQuery.DumpDebugInfo(sql));
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var unaryExpr = result.SprachedSqlAst.Where.Condition as UnaryExpression;
+		var unaryExpr = result.Where.Condition as UnaryExpression;
 		unaryExpr.Should().NotBeNull();
 		unaryExpr.Operator.Should().Be(UnaryOperator.Not);
 
@@ -701,17 +696,17 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.name = 'Alice' OR c.name = 'Bob'";
 
 		// Act
-		var result = _parser.Parse(sql);
-		output.WriteLine(CosmosDbSqlQueryParser.DumpDebugInfo(sql));
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
+		output.WriteLine(DebugQuery.DumpDebugInfo(sql));
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
-		var orExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var orExpr = result.Where.Condition as BinaryExpression;
 		orExpr.Should().NotBeNull();
 		orExpr.Operator.Should().Be(BinaryOperator.Or);
 
@@ -741,18 +736,18 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE (c.age > 20 AND c.name = 'Alice') OR (c.age < 18 AND NOT IS_NULL(c.guardian))";
 
 		// Act
-		var result = _parser.Parse(sql);
-		output.WriteLine(CosmosDbSqlQueryParser.DumpDebugInfo(sql));
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
+		output.WriteLine(DebugQuery.DumpDebugInfo(sql));
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
 
 		// Top level should be an OR expression
-		var orExpr = result.SprachedSqlAst.Where.Condition as BinaryExpression;
+		var orExpr = result.Where.Condition as BinaryExpression;
 		orExpr.Should().NotBeNull();
 		orExpr.Operator.Should().Be(BinaryOperator.Or);
 
@@ -808,23 +803,23 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT TOP 1 c.ppmEntityID FROM c WHERE c.id = @id";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeFalse();
-		result.SprachedSqlAst.Select.Items.Should().HaveCount(1);
-		result.SprachedSqlAst.Select.Items[0].Should().BeOfType<PropertySelectItem>();
-		((PropertySelectItem)result.SprachedSqlAst.Select.Items[0]).PropertyPath.Should().Be("c.ppmEntityID");
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Select.Top.Should().NotBeNull();
-		result.SprachedSqlAst.Select.Top.Value.Should().Be(1);
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeFalse();
+		result.Select.Items.Should().HaveCount(1);
+		result.Select.Items[0].Should().BeOfType<PropertySelectItem>();
+		((PropertySelectItem)result.Select.Items[0]).PropertyPath.Should().Be("c.ppmEntityID");
+		result.From.Source.Should().Be("c");
+		result.Select.Top.Should().NotBeNull();
+		result.Select.Top.Value.Should().Be(1);
 
 		// Check WHERE condition
-		result.SprachedSqlAst.Where.Should().NotBeNull();
-		result.SprachedSqlAst.Where.Condition.Should().BeOfType<BinaryExpression>();
-		var binaryExpr = (BinaryExpression)result.SprachedSqlAst.Where.Condition;
+		result.Where.Should().NotBeNull();
+		result.Where.Condition.Should().BeOfType<BinaryExpression>();
+		var binaryExpr = (BinaryExpression)result.Where.Condition;
 		binaryExpr.Operator.Should().Be(BinaryOperator.Equal);
 		binaryExpr.Left.Should().BeOfType<PropertyExpression>();
 		((PropertyExpression)binaryExpr.Left).PropertyPath.Should().Be("c.id");
@@ -839,17 +834,17 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.age > @ageParam";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
-		result.SprachedSqlAst.Where.Condition.Should().BeOfType<BinaryExpression>();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
+		result.Where.Condition.Should().BeOfType<BinaryExpression>();
 
-		var binaryExpression = (BinaryExpression)result.SprachedSqlAst.Where.Condition;
+		var binaryExpression = (BinaryExpression)result.Where.Condition;
 		binaryExpression.Operator.Should().Be(BinaryOperator.GreaterThan);
 		binaryExpression.Left.Should().BeOfType<PropertyExpression>();
 		((PropertyExpression)binaryExpression.Left).PropertyPath.Should().Be("c.age");
@@ -864,17 +859,17 @@ public class CosmosDbSqlQueryParserTests(ITestOutputHelper output)
 		var sql = "SELECT * FROM c WHERE c.age > @minAge AND c.age <= @maxAge";
 
 		// Act
-		var result = _parser.Parse(sql);
+		var result = CosmosDbSqlGrammar.ParseQuery(sql);
 
 		// Assert
 		result.Should().NotBeNull();
-		result.SprachedSqlAst.Should().NotBeNull();
-		result.SprachedSqlAst.Select.IsSelectAll.Should().BeTrue();
-		result.SprachedSqlAst.From.Source.Should().Be("c");
-		result.SprachedSqlAst.Where.Should().NotBeNull();
-		result.SprachedSqlAst.Where.Condition.Should().BeOfType<BinaryExpression>();
+		result.Should().NotBeNull();
+		result.Select.IsSelectAll.Should().BeTrue();
+		result.From.Source.Should().Be("c");
+		result.Where.Should().NotBeNull();
+		result.Where.Condition.Should().BeOfType<BinaryExpression>();
 
-		var andExpression = (BinaryExpression)result.SprachedSqlAst.Where.Condition;
+		var andExpression = (BinaryExpression)result.Where.Condition;
 		andExpression.Operator.Should().Be(BinaryOperator.And);
 
 		var leftExpression = (BinaryExpression)andExpression.Left;

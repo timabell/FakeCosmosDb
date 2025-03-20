@@ -16,7 +16,7 @@ namespace TimAbell.FakeCosmosDb.Implementation;
 public class FakeContainer : Container
 {
 	private readonly List<JObject> _store = new();
-	private readonly CosmosDbSqlQueryParser _queryParser;
+	private readonly DebugQuery _queryParser;
 	private readonly CosmosDbQueryExecutor _queryExecutor;
 	private readonly ICosmosDbPaginationManager _paginationManager = new CosmosDbPaginationManager();
 	private readonly ILogger _logger;
@@ -26,7 +26,7 @@ public class FakeContainer : Container
 
 	public FakeContainer(ILogger logger = null)
 	{
-		_queryParser = new CosmosDbSqlQueryParser();
+		_queryParser = new DebugQuery();
 		_queryExecutor = new CosmosDbQueryExecutor(logger);
 		_logger = logger;
 	}
@@ -452,8 +452,8 @@ public class FakeContainer : Container
 				var query = _queryDefinition?.QueryText;
 				var parameters = _queryDefinition?.GetQueryParameters();
 
-				var parsedQuery = _container._queryParser.Parse(query);
-				_queryResults = _queryExecutor.Execute(parsedQuery, _store, parameters);
+				var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
+				_queryResults = _queryExecutor.Execute(_store, parameters, parsedQuery);
 				_queryExecuted = true;
 
 				// If we have a pagination manager and max items count, use it to get the correct page

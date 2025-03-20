@@ -16,25 +16,25 @@ public class CosmosDbQueryExecutor
 		_logger = logger;
 	}
 
-	public IEnumerable<JObject> Execute(ParsedQuery query, List<JObject> store, IReadOnlyList<(string Name, object Value)> parameters)
+	public IEnumerable<JObject> Execute(List<JObject> store, IReadOnlyList<(string Name, object Value)> parameters, CosmosDbSqlQuery queryAst)
 	{
 		if (_logger != null)
 		{
 			_logger.LogDebug("Executing query on {count} documents", store.Count);
-			_logger.LogDebug("Query details - AST: {ast}", query.SprachedSqlAst != null ? "Present" : "null");
+			_logger.LogDebug("Query details - AST: {ast}", queryAst != null ? "Present" : "null");
 		}
 
 		var filtered = store.AsQueryable();
 
 		// Apply WHERE if specified
-		if (query.SprachedSqlAst != null && query.SprachedSqlAst.Where != null)
+		if (queryAst != null && queryAst.Where != null)
 		{
 			if (_logger != null)
 			{
 				_logger.LogDebug("Applying WHERE from AST");
 			}
 
-			filtered = filtered.Where(e => ApplyWhere(e, query.SprachedSqlAst.Where.Condition, parameters));
+			filtered = filtered.Where(e => ApplyWhere(e, queryAst.Where.Condition, parameters));
 		}
 		else
 		{
@@ -45,14 +45,14 @@ public class CosmosDbQueryExecutor
 		}
 
 		// Apply ORDER BY if specified
-		if (query.SprachedSqlAst != null && query.SprachedSqlAst.OrderBy != null && query.SprachedSqlAst.OrderBy.Items.Count > 0)
+		if (queryAst != null && queryAst.OrderBy != null && queryAst.OrderBy.Items.Count > 0)
 		{
 			if (_logger != null)
 			{
 				_logger.LogDebug("Applying ORDER BY from AST");
 			}
 
-			foreach (var orderByItem in query.SprachedSqlAst.OrderBy.Items)
+			foreach (var orderByItem in queryAst.OrderBy.Items)
 			{
 				if (_logger != null)
 				{
@@ -78,25 +78,25 @@ public class CosmosDbQueryExecutor
 		}
 
 		// Apply TOP if specified
-		if (query.SprachedSqlAst?.Select?.Top != null)
+		if (queryAst?.Select?.Top != null)
 		{
 			if (_logger != null)
 			{
-				_logger.LogDebug("Applying TOP {top} from AST", query.SprachedSqlAst.Select.Top.Value);
+				_logger.LogDebug("Applying TOP {top} from AST", queryAst.Select.Top.Value);
 			}
 
-			results = results.Take(query.SprachedSqlAst.Select.Top.Value).ToList();
+			results = results.Take(queryAst.Select.Top.Value).ToList();
 		}
 
 		// Apply LIMIT if specified
-		if (query.SprachedSqlAst != null && query.SprachedSqlAst.Limit != null)
+		if (queryAst != null && queryAst.Limit != null)
 		{
 			if (_logger != null)
 			{
-				_logger.LogDebug("Applying LIMIT {limit} from AST", query.SprachedSqlAst.Limit.Value);
+				_logger.LogDebug("Applying LIMIT {limit} from AST", queryAst.Limit.Value);
 			}
 
-			results = results.Take(query.SprachedSqlAst.Limit.Value).ToList();
+			results = results.Take(queryAst.Limit.Value).ToList();
 		}
 
 		if (_logger != null)
@@ -105,9 +105,9 @@ public class CosmosDbQueryExecutor
 		}
 
 		// Apply SELECT projection if not SELECT *
-		if (query.SprachedSqlAst != null && query.SprachedSqlAst.Select != null && !query.SprachedSqlAst.Select.IsSelectAll)
+		if (queryAst != null && queryAst.Select != null && !queryAst.Select.IsSelectAll)
 		{
-			var properties = GetSelectedProperties(query.SprachedSqlAst.Select);
+			var properties = GetSelectedProperties(queryAst.Select);
 			if (_logger != null)
 			{
 				_logger.LogDebug("Applying projection from AST for properties: {properties}", string.Join(", ", properties));
