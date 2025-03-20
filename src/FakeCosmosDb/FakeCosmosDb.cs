@@ -79,7 +79,8 @@ public class FakeCosmosDb : CosmosClient, ICosmosDb
 
 	public override Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new NotImplementedException();
+		var database = GetOrCreateDatabase(id);
+		return Task.FromResult<DatabaseResponse>(new FakeDatabaseResponse(database));
 	}
 
 	public override Container GetContainer(string databaseName, string containerId)
