@@ -23,57 +23,14 @@ public class CosmosDbSqlQueryParser()
 	/// <summary>
 	/// Dumps the current state of the parser for diagnostic purposes.
 	/// </summary>
-	public string DumpDebugInfo(string query)
+	public static string DumpDebugInfo(string query)
 	{
-		try
-		{
-			var sb = new System.Text.StringBuilder();
-			sb.AppendLine($"Original query: {query}");
+		var sb = new System.Text.StringBuilder();
+		sb.AppendLine($"Original query: {query}");
 
-			var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
-			sb.AppendLine($"AST: {parsedQuery}");
-
-			var legacyQuery = ConvertToLegacyParsedQuery(parsedQuery);
-			sb.AppendLine("\nLegacy ParsedQuery:");
-			sb.AppendLine($"- FromName: {legacyQuery.FromName}");
-			sb.AppendLine($"- FromAlias: {legacyQuery.FromAlias}");
-			sb.AppendLine($"- PropertyPaths: {string.Join(", ", legacyQuery.PropertyPaths)}");
-
-			if (legacyQuery.WhereConditions != null)
-			{
-				sb.AppendLine($"- WhereConditions ({legacyQuery.WhereConditions.Count}):");
-				foreach (var condition in legacyQuery.WhereConditions)
-				{
-					sb.AppendLine($"  * {condition.PropertyPath} {condition.Operator} {condition.Value} (Type: {condition.Value?.Type})");
-				}
-			}
-			else
-			{
-				sb.AppendLine("- WhereConditions: null");
-			}
-
-			if (legacyQuery.OrderBy != null)
-			{
-				sb.AppendLine($"- OrderBy ({legacyQuery.OrderBy.Count}):");
-				foreach (var order in legacyQuery.OrderBy)
-				{
-					sb.AppendLine($"  * {order.PropertyPath} {order.Direction}");
-				}
-			}
-			else
-			{
-				sb.AppendLine("- OrderBy: null");
-			}
-
-			sb.AppendLine($"- Limit: {legacyQuery.Limit}");
-			sb.AppendLine($"- TopValue: {legacyQuery.TopValue}");
-
-			return sb.ToString();
-		}
-		catch (Exception ex)
-		{
-			return $"Error dumping debug info: {ex.Message}";
-		}
+		var parsedQuery = CosmosDbSqlGrammar.ParseQuery(query);
+		sb.AppendLine($"AST: {parsedQuery}");
+		return sb.ToString();
 	}
 
 	/// <summary>
@@ -204,7 +161,7 @@ public class CosmosDbSqlQueryParser()
 				{
 					// For BETWEEN operator with two constant values
 					if (betweenExpr.LowerBound is ConstantExpression lowerConstExpr &&
-						betweenExpr.UpperBound is ConstantExpression upperConstExpr)
+					    betweenExpr.UpperBound is ConstantExpression upperConstExpr)
 					{
 						// Create a single BETWEEN condition
 						conditions.Add(new WhereCondition
@@ -265,9 +222,9 @@ public class CosmosDbSqlQueryParser()
 			string functionName = functionCall.FunctionName.ToUpperInvariant();
 
 			if ((functionName == "CONTAINS" || functionName == "STARTSWITH") &&
-				functionCall.Arguments.Count >= 2 &&
-				functionCall.Arguments[0] is PropertyExpression propExpr &&
-				functionCall.Arguments[1] is ConstantExpression constExpr)
+			    functionCall.Arguments.Count >= 2 &&
+			    functionCall.Arguments[0] is PropertyExpression propExpr &&
+			    functionCall.Arguments[1] is ConstantExpression constExpr)
 			{
 				var op = functionName == "CONTAINS" ? ComparisonOperator.StringContains : ComparisonOperator.StringStartsWith;
 
@@ -280,8 +237,8 @@ public class CosmosDbSqlQueryParser()
 
 				// For CONTAINS with 3 arguments, the third is a boolean for case-insensitivity
 				if (functionName == "CONTAINS" && functionCall.Arguments.Count == 3 &&
-					functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
-					caseInsensitiveArg.Value is bool ignoreCase)
+				    functionCall.Arguments[2] is ConstantExpression caseInsensitiveArg &&
+				    caseInsensitiveArg.Value is bool ignoreCase)
 				{
 					whereCondition.IgnoreCase = ignoreCase;
 				}
@@ -289,8 +246,8 @@ public class CosmosDbSqlQueryParser()
 				conditions.Add(whereCondition);
 			}
 			else if (functionName == "IS_NULL" &&
-					 functionCall.Arguments.Count == 1 &&
-					 functionCall.Arguments[0] is PropertyExpression propNullExpr)
+			         functionCall.Arguments.Count == 1 &&
+			         functionCall.Arguments[0] is PropertyExpression propNullExpr)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -300,8 +257,8 @@ public class CosmosDbSqlQueryParser()
 				});
 			}
 			else if (functionName == "IS_DEFINED" &&
-					 functionCall.Arguments.Count == 1 &&
-					 functionCall.Arguments[0] is PropertyExpression propDefinedExpr)
+			         functionCall.Arguments.Count == 1 &&
+			         functionCall.Arguments[0] is PropertyExpression propDefinedExpr)
 			{
 				conditions.Add(new WhereCondition
 				{
@@ -312,9 +269,9 @@ public class CosmosDbSqlQueryParser()
 				});
 			}
 			else if (functionName == "ARRAY_CONTAINS" &&
-					 functionCall.Arguments.Count == 2 &&
-					 functionCall.Arguments[0] is PropertyExpression propArrayExpr &&
-					 functionCall.Arguments[1] is ConstantExpression constArrayExpr)
+			         functionCall.Arguments.Count == 2 &&
+			         functionCall.Arguments[0] is PropertyExpression propArrayExpr &&
+			         functionCall.Arguments[1] is ConstantExpression constArrayExpr)
 			{
 				conditions.Add(new WhereCondition
 				{
