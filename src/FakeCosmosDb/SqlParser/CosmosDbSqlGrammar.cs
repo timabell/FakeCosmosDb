@@ -23,7 +23,11 @@ public static class CosmosDbSqlGrammar
 	// SQL keywords (case insensitive)
 	private static Parser<string> Keyword(string word)
 	{
-		return Parse.IgnoreCase(word).Text().Token();
+		// Ensure we match the entire word and not just a prefix of another word
+		return Parse.IgnoreCase(word)
+			.Then(x => Parse.WhiteSpace.AtLeastOnce().Or(Parse.Not(Parse.LetterOrDigit)).Return(word))
+			.Text()
+			.Token();
 	}
 
 	// Identifiers for table and column names
