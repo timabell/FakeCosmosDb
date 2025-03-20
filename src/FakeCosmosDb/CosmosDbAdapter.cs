@@ -18,9 +18,11 @@ namespace TimAbell.FakeCosmosDb;
 public class CosmosDbAdapter : ICosmosDb
 {
 	private readonly CosmosClient _cosmosClient;
-	private readonly string _databaseId;
-	private readonly ILogger _logger;
 
+	public CosmosDbAdapter(CosmosClient cosmosClient)
+	{
+		_cosmosClient = cosmosClient;
+	}
 	public CosmosDbAdapter(string connectionString, ILogger logger = null, string databaseId = "TestDb")
 		: this(connectionString, null, logger, databaseId)
 	{
@@ -28,10 +30,7 @@ public class CosmosDbAdapter : ICosmosDb
 
 	public CosmosDbAdapter(string connectionString, CosmosClientOptions clientOptions = null, ILogger logger = null, string databaseId = "TestDb")
 	{
-		_logger = logger;
-		_databaseId = databaseId;
-
-		_logger?.LogInformation("Initializing CosmosClient with connection to {databaseId}", databaseId);
+		logger?.LogInformation("Initializing CosmosClient with connection to {databaseId}", databaseId);
 		_cosmosClient = clientOptions != null
 			? new CosmosClient(connectionString, clientOptions)
 			: new CosmosClient(connectionString);
@@ -49,37 +48,37 @@ public class CosmosDbAdapter : ICosmosDb
 
 	public Task<ResponseMessage> CreateDatabaseStreamAsync(DatabaseProperties databaseProperties, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.CreateDatabaseStreamAsync(databaseProperties, throughput, requestOptions, cancellationToken);
 	}
 
 	public FeedIterator<T> GetDatabaseQueryIterator<T>(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.GetDatabaseQueryIterator<T>(queryDefinition, continuationToken, requestOptions);
 	}
 
 	public FeedIterator<T> GetDatabaseQueryIterator<T>(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.GetDatabaseQueryIterator<T>(queryText, continuationToken, requestOptions);
 	}
 
 	public FeedIterator GetDatabaseQueryStreamIterator(QueryDefinition queryDefinition, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.GetDatabaseQueryStreamIterator(queryDefinition, continuationToken, requestOptions);
 	}
 
 	public Task<AccountProperties> ReadAccountAsync()
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.ReadAccountAsync();
 	}
 
 	public FeedIterator GetDatabaseQueryStreamIterator(string queryText = null, string continuationToken = null, QueryRequestOptions requestOptions = null)
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.GetDatabaseQueryStreamIterator(queryText, continuationToken, requestOptions);
 	}
 
 	public Task<DatabaseResponse> CreateDatabaseIfNotExistsAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.CreateDatabaseIfNotExistsAsync(id, throughputProperties, requestOptions, cancellationToken);
 	}
 
 	public Container GetContainer(string databaseName, string containerId)
@@ -99,11 +98,11 @@ public class CosmosDbAdapter : ICosmosDb
 
 	public Task<DatabaseResponse> CreateDatabaseAsync(string id, ThroughputProperties throughputProperties, RequestOptions requestOptions = null, CancellationToken cancellationToken = new CancellationToken())
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.CreateDatabaseAsync(id, throughputProperties, requestOptions, cancellationToken);
 	}
 
 	public Task<DatabaseResponse> CreateDatabaseAsync(string databaseName, int? throughput = null, RequestOptions requestOptions = null, CancellationToken cancellationToken = default)
 	{
-		throw new System.NotImplementedException();
+		return _cosmosClient.CreateDatabaseAsync(databaseName, throughput, requestOptions, cancellationToken);
 	}
 }
