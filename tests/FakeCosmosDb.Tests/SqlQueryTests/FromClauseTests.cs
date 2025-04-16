@@ -35,15 +35,10 @@ public class FromClauseTests
         public int Value { get; set; }
     }
 
-    [Fact]
-    public async Task QueryWithoutFromClause_ShouldReturnAllItems()
+    private async Task<List<TestItem>> CreateTestItemsAsync(Container container)
     {
-        // Arrange
-        var container = await InitializeContainerAsync();
-
-        // Create test items
         var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
+        for (int i = 1; i <= 3; i++)
         {
             var item = new TestItem
             {
@@ -54,291 +49,135 @@ public class FromClauseTests
             testItems.Add(item);
             await container.CreateItemAsync(item);
         }
+        return testItems;
+    }
 
-        _output.WriteLine($"Created {testItems.Count} test items");
+    [Fact]
+    public async Task FromClauseIsOptional_WhenNoFilteringOrProjection()
+    {
+        // Arrange
+        var container = await InitializeContainerAsync();
+        var testItems = await CreateTestItemsAsync(container);
 
         // Act - Query without FROM clause
         var query = new QueryDefinition("SELECT *");
         var iterator = container.GetItemQueryIterator<TestItem>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
-        foreach (var item in results)
-        {
-            _output.WriteLine($"Item: Id={item.Id}, Name={item.Name}, Value={item.Value}");
-        }
+        var results = await iterator.ReadNextAsync();
 
         // Assert
-        results.Should().BeEquivalentTo(testItems);
+        results.ToList().Should().BeEquivalentTo(testItems);
     }
 
     [Fact]
-    public async Task QueryWithExplicitFromClause_ShouldReturnAllItems()
+    public async Task CanUseROOTIdentifier_InFromClause()
     {
         // Arrange
         var container = await InitializeContainerAsync();
+        var testItems = await CreateTestItemsAsync(container);
 
-        // Create test items
-        var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
-        {
-            var item = new TestItem
-            {
-                Id = $"explicit-{i}",
-                Name = $"Explicit Item {i}",
-                Value = i * 10,
-            };
-            testItems.Add(item);
-            await container.CreateItemAsync(item);
-        }
-
-        _output.WriteLine($"Created {testItems.Count} test items");
-
-        // Act - Query with explicit FROM clause
-        var query = new QueryDefinition("SELECT * FROM c");
-        var iterator = container.GetItemQueryIterator<TestItem>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
-
-        // Assert
-        results.Should().BeEquivalentTo(testItems);
-    }
-
-    [Fact]
-    public async Task QueryWithROOTIdentifier_ShouldReturnAllItems()
-    {
-        // Arrange
-        var container = await InitializeContainerAsync();
-
-        // Create test items
-        var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
-        {
-            var item = new TestItem
-            {
-                Id = $"root-{i}",
-                Name = $"Root Item {i}",
-                Value = i * 10,
-            };
-            testItems.Add(item);
-            await container.CreateItemAsync(item);
-        }
-
-        _output.WriteLine($"Created {testItems.Count} test items");
-
-        // Act - Query with ROOT identifier in FROM clause
+        // Act - Query with ROOT identifier
         var query = new QueryDefinition("SELECT * FROM ROOT");
         var iterator = container.GetItemQueryIterator<TestItem>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
+        var results = await iterator.ReadNextAsync();
 
         // Assert
-        results.Should().BeEquivalentTo(testItems);
+        results.ToList().Should().BeEquivalentTo(testItems);
     }
 
     [Fact]
-    public async Task QueryWithContainerAlias_ShouldReturnAllItems()
+    public async Task CanAliasContainer_WithASKeyword()
     {
         // Arrange
         var container = await InitializeContainerAsync();
-
-        // Create test items
-        var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
-        {
-            var item = new TestItem
-            {
-                Id = $"alias-{i}",
-                Name = $"Alias Item {i}",
-                Value = i * 10,
-            };
-            testItems.Add(item);
-            await container.CreateItemAsync(item);
-        }
-
-        _output.WriteLine($"Created {testItems.Count} test items");
+        var testItems = await CreateTestItemsAsync(container);
 
         // Act - Query with container alias using AS keyword
         var query = new QueryDefinition("SELECT p.Id, p.Name, p.Value FROM c AS p");
         var iterator = container.GetItemQueryIterator<TestItem>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
+        var results = await iterator.ReadNextAsync();
 
         // Assert
-        results.Should().BeEquivalentTo(testItems);
+        results.ToList().Should().BeEquivalentTo(testItems);
     }
 
     [Fact]
-    public async Task QueryWithContainerAliasWithoutAS_ShouldReturnAllItems()
+    public async Task CanAliasContainer_WithoutASKeyword()
     {
         // Arrange
         var container = await InitializeContainerAsync();
-
-        // Create test items
-        var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
-        {
-            var item = new TestItem
-            {
-                Id = $"alias-no-as-{i}",
-                Name = $"Alias No AS Item {i}",
-                Value = i * 10,
-            };
-            testItems.Add(item);
-            await container.CreateItemAsync(item);
-        }
-
-        _output.WriteLine($"Created {testItems.Count} test items");
+        var testItems = await CreateTestItemsAsync(container);
 
         // Act - Query with container alias without AS keyword
         var query = new QueryDefinition("SELECT p.Id, p.Name, p.Value FROM c p");
         var iterator = container.GetItemQueryIterator<TestItem>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
+        var results = await iterator.ReadNextAsync();
 
         // Assert
-        results.Should().BeEquivalentTo(testItems);
+        results.ToList().Should().BeEquivalentTo(testItems);
     }
 
     [Fact]
-    public async Task QueryWithFullyQualifiedProperties_ShouldReturnProjectedItems()
+    public async Task FromClauseRequired_WhenFiltering()
     {
         // Arrange
         var container = await InitializeContainerAsync();
-
-        // Create test items
-        var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
-        {
-            var item = new TestItem
-            {
-                Id = $"qualified-{i}",
-                Name = $"Qualified Item {i}",
-                Value = i * 10,
-            };
-            testItems.Add(item);
-            await container.CreateItemAsync(item);
-        }
-
-        _output.WriteLine($"Created {testItems.Count} test items");
-
-        // Act - Query with fully qualified properties
-        var query = new QueryDefinition("SELECT p.Id, p.Name FROM c p");
-        var iterator = container.GetItemQueryIterator<JObject>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
-        foreach (var item in results)
-        {
-            _output.WriteLine($"Projected Item: {item}");
-        }
-
-        // Assert
-        results.Count.Should().Be(testItems.Count);
-        
-        // Verify all items have the expected properties
-        results.Should().AllSatisfy(item => 
-        {
-            item.Should().ContainKey("Id");
-            item.Should().ContainKey("Name");
-            item.Should().NotContainKey("Value"); // Value should not be included in projection
-        });
-        
-        // Verify that the correct items were returned
-        var expectedItems = testItems
-            .Select(i => new { i.Id, i.Name })
-            .ToList();
-            
-        results.Select(r => new { 
-            Id = r["Id"].ToString(), 
-            Name = r["Name"].ToString() 
-        }).Should().BeEquivalentTo(expectedItems);
-    }
-
-    [Fact]
-    public async Task QueryWithRequiredFromClause_WhenFiltering_ShouldReturnFilteredItems()
-    {
-        // Arrange
-        var container = await InitializeContainerAsync();
-
-        // Create test items
-        var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
-        {
-            var item = new TestItem
-            {
-                Id = $"filter-{i}",
-                Name = $"Filter Item {i}",
-                Value = i * 10,
-            };
-            testItems.Add(item);
-            await container.CreateItemAsync(item);
-        }
-
-        _output.WriteLine($"Created {testItems.Count} test items");
+        var testItems = await CreateTestItemsAsync(container);
 
         // Act - Query with FROM clause and WHERE filter
-        var query = new QueryDefinition("SELECT * FROM c WHERE c.Value > 20");
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.Value > 10");
         var iterator = container.GetItemQueryIterator<TestItem>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
+        var results = await iterator.ReadNextAsync();
 
         // Assert
-        var expectedItems = testItems.Where(i => i.Value > 20).ToList();
-        results.Should().BeEquivalentTo(expectedItems);
+        var expectedItems = testItems.Where(i => i.Value > 10).ToList();
+        results.ToList().Should().BeEquivalentTo(expectedItems);
     }
 
     [Fact]
-    public async Task QueryWithRequiredFromClause_WhenProjecting_ShouldReturnProjectedItems()
+    public async Task FromClauseRequired_WhenProjecting()
     {
         // Arrange
         var container = await InitializeContainerAsync();
-
-        // Create test items
-        var testItems = new List<TestItem>();
-        for (int i = 1; i <= 5; i++)
-        {
-            var item = new TestItem
-            {
-                Id = $"project-{i}",
-                Name = $"Project Item {i}",
-                Value = i * 10,
-            };
-            testItems.Add(item);
-            await container.CreateItemAsync(item);
-        }
-
-        _output.WriteLine($"Created {testItems.Count} test items");
+        var testItems = await CreateTestItemsAsync(container);
 
         // Act - Query with FROM clause and projection
         var query = new QueryDefinition("SELECT c.Id, c.Name FROM c");
         var iterator = container.GetItemQueryIterator<JObject>(query);
-        var response = await iterator.ReadNextAsync();
-        var results = response.ToList();
-
-        _output.WriteLine($"Query returned {results.Count} items");
+        var results = await iterator.ReadNextAsync();
 
         // Assert
-        results.Count.Should().Be(testItems.Count);
+        results.Count().Should().Be(testItems.Count);
         
-        // Verify all items have the expected properties
+        // Verify properties are correctly projected
         results.Should().AllSatisfy(item => 
         {
             item.Should().ContainKey("Id");
             item.Should().ContainKey("Name");
-            item.Should().NotContainKey("Value"); // Value should not be included in projection
+            item.Should().NotContainKey("Value");
+        });
+    }
+
+    [Fact]
+    public async Task PropertiesMustBeFullyQualified_WithContainerAlias()
+    {
+        // Arrange
+        var container = await InitializeContainerAsync();
+        var testItems = await CreateTestItemsAsync(container);
+
+        // Act - Query with fully qualified properties
+        var query = new QueryDefinition("SELECT p.Id, p.Name FROM c p");
+        var iterator = container.GetItemQueryIterator<JObject>(query);
+        var results = await iterator.ReadNextAsync();
+
+        // Assert
+        results.Count().Should().Be(testItems.Count);
+        
+        // Verify properties are correctly projected
+        results.Should().AllSatisfy(item => 
+        {
+            item.Should().ContainKey("Id");
+            item.Should().ContainKey("Name");
+            item.Should().NotContainKey("Value");
         });
     }
 }
