@@ -246,6 +246,15 @@ Contributions are welcome! Here's how you can help:
 - Use method chaining syntax (`.Select()`, `.Where()`) instead of LINQ query syntax (`from ... in ... select`) due to netstandard2.1 compatibility
 - Respect the .editorconfig settings
 
+## Alternatives
+
+- [Cosmium.EmbeddedServer nuget package](https://www.nuget.org/packages/Cosmium.EmbeddedServer#readme-body-tab) - "wraps and extends Cosmium, a CosmosDB emulator"
+- [Cosmium](https://github.com/pikami/cosmium) - "Cosmium is a lightweight Cosmos DB emulator designed to facilitate local development and testing"
+- The [official ComsosDb emulator](https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-develop-emulator)	
+- The real ComsosDb on Azure
+- Custom C# interface/class for just the cosmos features you use in your project and a mocking library like [FakeItEasy](https://www.nuget.org/packages/FakeItEasy) plus some dependency injection.
+- Not using CosmosDb
+
 ## License
 
 MIT License - [License information](LICENSE)
