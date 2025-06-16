@@ -29,7 +29,6 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
-    <IsTrimmable>true</IsTrimmable>
     <Company>Tim Abell</Company>
     <Product>FakeCosmosDb</Product>
     <PackageReadmeFile>README.md</PackageReadmeFile>
