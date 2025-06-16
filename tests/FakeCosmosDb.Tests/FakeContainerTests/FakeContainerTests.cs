@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;
 using TimAbell.FakeCosmosDb.Implementation;

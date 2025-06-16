@@ -1,7 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
-using FluentAssertions;
-using FluentAssertions.Execution;
+using AwesomeAssertions;
+using AwesomeAssertions.Execution;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using TimAbell.FakeCosmosDb.Tests.Utilities;

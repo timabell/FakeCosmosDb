@@ -1,5 +1,5 @@
 using System.Linq;
-using FluentAssertions;
+using AwesomeAssertions;
 using TimAbell.FakeCosmosDb.SqlParser;
 using Xunit;
 using Xunit.Abstractions;
