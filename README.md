@@ -37,6 +37,17 @@ This project is under active development with several features implemented and o
 dotnet add package FakeCosmosDb
 ```
 
+## Release Notes
+
+For release notes and changelog, see the [GitHub Releases](https://github.com/timabell/FakeCosmosDb/releases) page.
+
+Unfortunately release notes in nuget packages and on nuget.org are still trash so we're not bothering setting those.
+
+- [msbuild - Nuget PackageReleaseNotes as link instead of static text - Stack Overflow](https://stackoverflow.com/questions/73095675/nuget-packagereleasenotes-as-link-instead-of-static-text)
+- [github.com: Reduce friction for Release Notes maintenance - release notes pack support · Issue #1203 · NuGet/Home](https://github.com/NuGet/Home/issues/1203)
+
+Release notes are generated with [cliff](https://github.com/orhun/git-cliff) from [conventional git commit messages](https://www.conventionalcommits.org/).
+
 ## Usage Examples
 
 ### Example 1: Direct Substitution for CosmosClient

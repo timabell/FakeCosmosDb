@@ -9,10 +9,14 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for creating GitHub releases
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Required for git-cliff to access full git history
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -27,6 +31,13 @@ jobs:
         # using the approach to generate the version in another job for others to use works better than doing that in a global variable, c.f.: https://github.com/orgs/community/discussions/45488
         run: echo "VERSION=${GITHUB_REF_NAME//v/}" >> $GITHUB_OUTPUT
 
+      - name: Generate Release Notes
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: .github/cliff.toml
+          args: --latest --strip header
+
       - name: Pack
         env:
           VERSION: ${{ steps.gen_version.outputs.VERSION }}
@@ -36,3 +47,11 @@ jobs:
         env:
           VERSION: ${{ steps.gen_version.outputs.VERSION }}
         run: dotnet nuget push ./src/FakeCosmosDb/bin/Release/FakeCosmosDb.${{ env.VERSION }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.changelog.outputs.content }}
+          files: |
+            ./src/FakeCosmosDb/bin/Release/FakeCosmosDb.${{ steps.gen_version.outputs.VERSION }}.nupkg
+            ./src/FakeCosmosDb/bin/Release/FakeCosmosDb.${{ steps.gen_version.outputs.VERSION }}.snupkg
