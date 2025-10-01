@@ -1,4 +1,6 @@
-# TimAbell.FakeCosmosDb - Fake CosmosClientfor Testing
+# TimAbell.FakeCosmosDb - Fake CosmosClient for Testing
+
+https://github.com/timabell/FakeCosmosDb
 
 An in-memory implementation of Azure Cosmos DB for testing .NET applications without external dependencies.
 
