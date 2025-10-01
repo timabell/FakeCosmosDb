@@ -9,4 +9,4 @@ fi
 
 dotnet outdated -u --no-restore
 dotnet test
-git commit --include '*.csproj' --message "Nuget update/upgrade"
+git commit --include '*.csproj' --message "chore: Nuget update/upgrade"

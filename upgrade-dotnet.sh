@@ -7,4 +7,4 @@ echo $latest
 asdf install dotnet-core $latest
 asdf set dotnet-core $latest
 dotnet test
-git commit --include .tool-versions --message "Upgrade dotnet-core to latest"
+git commit --include .tool-versions --message "chore: Upgrade dotnet-core to latest"
