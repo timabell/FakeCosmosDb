@@ -224,10 +224,13 @@ public class FakeContainer : Container
 		}
 		else
 		{
+  			// Get the actual partition key path for the container
+			var partitionKeyPath = PartitionKeyPath?.TrimStart('/') ?? "partitionKey";
+
 			// Find by both ID and partition key
 			existingItem = _store.FirstOrDefault(doc =>
 				(doc["id"]?.ToString() == id || doc["Id"]?.ToString() == id) &&
-				doc["partitionKey"]?.ToString() == partitionKeyValue);
+				doc[partitionKeyPath]?.ToString() == partitionKeyValue);
 		}
 
 		// If item exists, remove it from the store
