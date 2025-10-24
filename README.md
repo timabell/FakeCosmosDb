@@ -18,8 +18,6 @@ Using this library also makes it trivial to reset test data state as you can jus
 
 ## Current Status
 
-This project is under active development with several features implemented and others still in progress:
-
 - ✅ In-memory document storage with container support
 - ✅ SQL query parsing for basic SELECT, WHERE, and ORDER BY operations
 - ✅ Support for common SQL functions (CONTAINS, STARTSWITH, etc.)
