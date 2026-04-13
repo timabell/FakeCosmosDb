@@ -49,7 +49,7 @@ jobs:
         run: dotnet nuget push ./src/FakeCosmosDb/bin/Release/FakeCosmosDb.${{ env.VERSION }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body: ${{ steps.changelog.outputs.content }}
           files: |
